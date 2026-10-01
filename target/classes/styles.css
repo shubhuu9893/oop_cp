@@ -1,0 +1,51 @@
+/* Styles for CacheBrowse application */
+.root {
+    -fx-font-family: "Segoe UI", Arial, sans-serif;
+    -fx-background-color: #0f172a;
+}
+
+.top-bar {
+    -fx-background-color: #111827;
+    -fx-padding: 10px;
+    -fx-spacing: 8px;
+}
+
+.button {
+    -fx-background-color: #1e293b;
+    -fx-text-fill: white;
+    -fx-background-radius: 6px;
+    -fx-padding: 8px 14px;
+}
+
+.button:hover {
+    -fx-background-color: #334155;
+}
+
+.text-field {
+    -fx-background-color: #1e293b;
+    -fx-text-fill: white;
+    -fx-prompt-text-fill: #94a3b8;
+    -fx-background-radius: 6px;
+    -fx-border-color: #475569;
+    -fx-border-radius: 6px;
+}
+
+.tab-pane {
+    -fx-background-color: #0f172a;
+}
+
+.tab {
+    -fx-background-color: #1e293b;
+}
+
+.tab-label {
+    -fx-text-fill: white;
+}
+
+.label {
+    -fx-text-fill: white;
+}
+
+.web-view {
+    -fx-background-color: white;
+}
