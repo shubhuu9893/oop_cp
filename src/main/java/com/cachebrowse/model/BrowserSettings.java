@@ -1,29 +1,53 @@
 package com.cachebrowse.model;
 
+import com.cachebrowse.config.EnvConfig;
+
 import java.time.Duration;
 
 /**
  * Holds user-configurable settings for the browser.
  */
 public class BrowserSettings {
-    private String defaultSearchEngine = "https://www.google.com/search?q=%s";
-    private String homePage = "https://www.homepage.com";
+    private String userId = com.cachebrowse.auth.UserSession.ANONYMOUS_USER_ID;
+    private String defaultSearchEngine = EnvConfig.get("SEARCH_ENGINE_URL").isBlank()
+            ? "https://html.duckduckgo.com/html/?q=%s" : EnvConfig.get("SEARCH_ENGINE_URL");
+    // Default homepage is an internal CacheBrowse page. Using a custom URI scheme to avoid
+    // accidental external navigation and to keep the application fully offline when opening
+    // the default page.
+    private String homePage = "cachebrowse://home";
     private boolean cacheEnabled = true;
     private Duration cacheTTL = Duration.ofMinutes(5);
     private int cacheCapacity = 100;
     private boolean adBlockingEnabled = true;
     private boolean trackerBlockingEnabled = true;
-    // ---------------------------------------------------------------------
-    // Basic getters – the UI and proxy layer read these values. Setters are
-    // intentionally simple; persistence is handled elsewhere (e.g., SettingsManager).
-    // ---------------------------------------------------------------------
+
+    public BrowserSettings() {
+    }
+
+    public BrowserSettings(String userId) {
+        if (userId != null && !userId.isBlank()) {
+            this.userId = userId;
+        }
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        if (userId != null && !userId.isBlank()) {
+            this.userId = userId.trim();
+        }
+    }
 
     public String getDefaultSearchEngine() {
         return defaultSearchEngine;
     }
 
     public void setDefaultSearchEngine(String engine) {
-        if (engine != null && !engine.isBlank()) this.defaultSearchEngine = engine.trim();
+        if (engine != null && !engine.isBlank()) {
+            this.defaultSearchEngine = engine.trim();
+        }
     }
 
     public String getHomePage() {
@@ -31,14 +55,28 @@ public class BrowserSettings {
     }
 
     public void setHomePage(String url) {
-        if (url != null && !url.isBlank()) this.homePage = url.trim();
+        if (url != null && !url.isBlank()) {
+            this.homePage = url.trim();
+        }
     }
 
-    public boolean isCacheEnabled() { return cacheEnabled; }
-    public void setCacheEnabled(boolean enabled) { this.cacheEnabled = enabled; }
+    public boolean isCacheEnabled() {
+        return cacheEnabled;
+    }
 
-    public Duration getCacheTTL() { return cacheTTL; }
-    public void setCacheTTL(Duration ttl) { if (ttl != null && !ttl.isNegative()) this.cacheTTL = ttl; }
+    public void setCacheEnabled(boolean enabled) {
+        this.cacheEnabled = enabled;
+    }
+
+    public Duration getCacheTTL() {
+        return cacheTTL;
+    }
+
+    public void setCacheTTL(Duration ttl) {
+        if (ttl != null && !ttl.isNegative()) {
+            this.cacheTTL = ttl;
+        }
+    }
 
     /**
      * Convenience getter returning TTL in milliseconds.
@@ -51,15 +89,34 @@ public class BrowserSettings {
      * Convenience setter accepting TTL in milliseconds.
      */
     public void setCacheTtl(long millis) {
-        if (millis > 0) this.cacheTTL = Duration.ofMillis(millis);
+        if (millis > 0) {
+            this.cacheTTL = Duration.ofMillis(millis);
+        }
     }
 
-    public int getCacheCapacity() { return cacheCapacity; }
-    public void setCacheCapacity(int capacity) { if (capacity > 0) this.cacheCapacity = capacity; }
+    public int getCacheCapacity() {
+        return cacheCapacity;
+    }
 
-    public boolean isAdBlockingEnabled() { return adBlockingEnabled; }
-    public void setAdBlockingEnabled(boolean enabled) { this.adBlockingEnabled = enabled; }
+    public void setCacheCapacity(int capacity) {
+        if (capacity > 0) {
+            this.cacheCapacity = capacity;
+        }
+    }
 
-    public boolean isTrackerBlockingEnabled() { return trackerBlockingEnabled; }
-    public void setTrackerBlockingEnabled(boolean enabled) { this.trackerBlockingEnabled = enabled; }
+    public boolean isAdBlockingEnabled() {
+        return adBlockingEnabled;
+    }
+
+    public void setAdBlockingEnabled(boolean enabled) {
+        this.adBlockingEnabled = enabled;
+    }
+
+    public boolean isTrackerBlockingEnabled() {
+        return trackerBlockingEnabled;
+    }
+
+    public void setTrackerBlockingEnabled(boolean enabled) {
+        this.trackerBlockingEnabled = enabled;
+    }
 }

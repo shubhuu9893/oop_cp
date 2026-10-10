@@ -1,59 +1,102 @@
 package com.cachebrowse.adblock;
 
-import java.io.IOException;
-import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
- * Simple tracker blocker – blocks requests that target known tracking domains.
+ * Tracker blocker that blocks URLs matching telemetry, analytics, and tracking domains.
  */
 public class TrackerBlocker {
-    private final Set<String> trackerList = new HashSet<>();
+    private final BlockList blockList;
+    private volatile boolean enabled = true;
 
     public TrackerBlocker() {
-        loadDefaultList();
+        Set<String> defaultTrackers = Set.of(
+                "stats.google.com",
+                "google-analytics.com",
+                "*.google-analytics.com",
+                "analytics.google.com",
+                "hotjar.com",
+                "*.hotjar.com",
+                "pixel.facebook.com",
+                "www.facebook.com/tr/",
+                "connect.facebook.net",
+                "tracker.yahoo.com",
+                "segment.io",
+                "*.segment.io",
+                "segment.com",
+                "*.segment.com",
+                "mixpanel.com",
+                "*.mixpanel.com",
+                "scorecardresearch.com",
+                "*.scorecardresearch.com",
+                "quantserve.com",
+                "*.quantserve.com",
+                "telemetry.mozilla.org",
+                "clarity.ms",
+                "*.clarity.ms",
+                "amplitude.com",
+                "*.amplitude.com",
+                "heapanalytics.com",
+                "crazyegg.com",
+                "mouseflow.com",
+                "fullstory.com",
+                "newrelic.com",
+                "bam.nr-data.net",
+                "sentry.io",
+                "bugsnag.com",
+                "branch.io",
+                "appsflyer.com",
+                "adjust.com",
+                "kochava.com",
+                "singular.net",
+                "optimizely.com",
+                "loggly.com",
+                "matomo.cloud",
+                "statcounter.com",
+                "kissmetrics.io",
+                "chartbeat.com",
+                "*.chartbeat.com",
+                "parsely.com",
+                "snowplowanalytics.com",
+                "/telemetry",
+                "/analytics/tracker",
+                "/ping?analytics"
+        );
+        this.blockList = new BlockList("data/tracker_rules.txt", defaultTrackers);
     }
 
-    private void loadDefaultList() {
-        try {
-            Path path = Path.of("data", "tracker_list.txt");
-            if (Files.exists(path)) {
-                trackerList.addAll(Files.readAllLines(path)
-                        .stream()
-                        .map(String::trim)
-                        .filter(l -> !l.isEmpty() && !l.startsWith("#"))
-                        .collect(Collectors.toSet()));
-            }
-        } catch (Exception ignored) {
-            // ignore, use defaults
-        }
+    public boolean isEnabled() {
+        return enabled;
+    }
 
-        trackerList.addAll(Set.of(
-                "stats.google.com",
-                "www.facebook.com/tr/",
-                "tracker.yahoo.com"
-        ));
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     public boolean isTrackerBlocked(String url) {
-        try {
-            URI uri = URI.create(url);
-            String host = uri.getHost();
-            if (host == null) return false;
-            for (String pattern : trackerList) {
-                if (pattern.startsWith("*")) {
-                    if (host.endsWith(pattern.substring(1))) return true;
-                } else {
-                    if (host.contains(pattern.toLowerCase())) return true;
-                }
-            }
-        } catch (Exception e) {
-            // malformed URL
+        if (!enabled || url == null || url.isBlank()) {
+            return false;
         }
-        return false;
+        return blockList.matches(url);
+    }
+
+    public void addRule(String rule) {
+        blockList.addRule(rule);
+    }
+
+    public void removeRule(String rule) {
+        blockList.removeRule(rule);
+    }
+
+    public void clearRules() {
+        blockList.clearRules();
+    }
+
+    public Set<String> getRules() {
+        return blockList.getRules();
+    }
+
+    public int getRuleCount() {
+        return blockList.size();
     }
 }

@@ -1,8 +1,69 @@
 # CacheBrowse
 
-**Java Smart Caching & Ad-Blocking Browser**
+**CacheBrowse is a React + Vite UI hosted by Electron's Chromium engine, with the Java/Maven backend providing application services.** Websites render in isolated Chromium `WebContentsView` tabs inside CacheBrowse; Vite-only mode is available for UI development but cannot render arbitrary websites.
 
-CacheBrowse is a lightweight educational desktop browser-like application built with Java and JavaFX. It demonstrates how browser requests, custom caching, networking, ad/tracker blocking, databases, authentication, multithreading, and performance monitoring can work together.
+## Run locally
+
+Requirements: Node.js/npm, Java 21, Maven, and a graphical desktop session. From `frontend`, install packages once and launch the complete app:
+
+```sh
+cd frontend
+npm install
+npm run dev
+```
+
+This starts Vite at `http://127.0.0.1:5173`, opens the CacheBrowse Electron window, and starts Java on `http://127.0.0.1:8080` if the API is not already available. Wait for the UI and backend readiness messages in the terminal. Chromium navigation and protection run in the Electron window; merely opening the Vite URL in Chrome is not running CacheBrowse's browser engine.
+
+For individual services, run `mvn -q exec:java` from the repository root to start Java separately, then use `npm run dev:web` in `frontend` for UI-only development. Vite-only mode deliberately does not navigate external pages: a normal web page cannot embed arbitrary cross-origin websites reliably or control another browser's tabs. Use `npm run dev` for actual browsing. `npm run build` builds the React UI for the Electron host; `npm run smoke:desktop` runs the Chromium integration smoke test when the desktop app is already running with remote debugging enabled.
+
+`SEARCH_ENGINE_URL` configures the Java search provider (default DuckDuckGo) and must contain `%s`. Set `VITE_API_TARGET` to change the development proxy target, or `CACHEBROWSE_API_PORT` to change the Java listener port.
+
+Cloudflare D1 remains optional and uses `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `D1_DATABASE_ID`; Firebase email/password auth uses `FIREBASE_API_KEY`. Values may come from process environment or the repository-root `.env`. Never commit that file or print secret values. If D1 is not reachable, Java reports process-memory fallback mode.
+
+### D1 and Firebase configuration
+
+Copy `.env.example` to `.env` and fill it locally. The Java backend reads these variables from the process environment or the repository-root `.env`, including when launched from a child directory; process environment values take precedence. Keep `.env` private (for example, `chmod 600 .env`), and rotate any credential that has been pasted into chat or committed.
+
+- Find the Account ID in the Cloudflare dashboard's account overview. Find the D1 database ID on that database's details page under Workers & Pages → D1.
+- Create a Cloudflare API token scoped to the intended account with D1 read/write permissions. The backend calls `POST https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/{database_id}/query` using a Bearer token.
+- `FIREBASE_API_KEY` is the Firebase project's Web API key used by Identity Toolkit email/password sign-in. Enable Email/Password in Firebase Authentication and restrict the key to the required Firebase Identity Toolkit APIs and authorized app domains where supported. Firebase login is independent of D1 persistence.
+- Start Java from the repository root with `mvn -q exec:java`. The startup diagnostic checks `SELECT 1`, then applies idempotent `CREATE TABLE IF NOT EXISTS` schema statements. The React Settings page reports the precise sanitized D1 issue and offers **Check D1 connection** to retry the current process configuration and schema initialization. Restart Java after editing `.env`; configuration is read at process startup.
+- `missing_credentials`, `invalid_credentials`, `insufficient_permissions`, `account_or_database_not_found`, `dns_error`, `tls_error`, `request_timeout`, `sql_error`, and `schema_initialization_failed` indicate distinct failure classes. Do not treat the generic “configuration complete” log as proof of connectivity; only `persistenceAvailable: true` after the connection probe and schema initialization means D1 persistence is active.
+
+The `.env.example` file contains placeholders only. Never put real credentials in source control or bug reports.
+
+## Browser runtime and limits
+
+The embedded engine is the Electron-bundled Chromium runtime using one persistent, protection-enabled session and one `WebContentsView` per tab. React draws browser chrome; Java continues to provide search resolution, history, bookmarks, settings, and statistics. The preload exposes a narrow validated IPC surface, with context isolation, sandboxing, Node integration disabled for pages, and HTTPS/HTTP-only navigation. Website requests opened in this runtime are subject to CacheBrowse's Chromium filter; websites opened in another browser are not. As with other filter engines, this does not guarantee removal of every YouTube ad. Vite-only mode is UI-only and displays a diagnostic instead of opening destinations externally.
+
+## Build and test
+
+```sh
+# Backend tests (does not start the API server)
+mvn -q test
+
+# Frontend
+cd frontend
+npm test
+npm run build
+```
+
+Older project-design notes below describe the original JavaFX browser exercise and are historical; they are not the current local-web startup instructions.
+
+### Browser engine smoke test
+
+```sh
+cd frontend
+CACHEBROWSE_REMOTE_DEBUGGING_PORT=9222 npm run dev
+# In another frontend terminal, once CacheBrowse has started:
+npm run smoke:desktop
+```
+
+The smoke test visits real websites and exercises navigation/tabs and an actual blocked request. Disable/replace Cloudflare credentials before running it if necessary; set `CACHEBROWSE_DISABLE_D1=true CACHEBROWSE_DISABLE_FIREBASE=true` for the desktop launch to keep this test isolated from configured account services.
+
+The remainder of this README contains original course-project/design notes. Where its older JavaFX diagrams or feature descriptions conflict with the current runtime section above, the current runtime section is authoritative.
+
+CacheBrowse began as a lightweight educational Java/JavaFX project and is being transitioned to the desktop runtime described above.
 
 > **Note:** CacheBrowse is an educational/course project. It is not intended to replace Chrome, Firefox, Brave, or other production browsers.
 
@@ -24,8 +85,8 @@ The project combines:
 - TTL expiration
 - Ad blocking
 - Tracker blocking
-- PostgreSQL/Supabase
-- Firebase Authentication
+- Cloudflare D1 Database
+- Firebase / Session Authentication
 - Browser history
 - Bookmarks
 - Performance statistics
@@ -443,23 +504,19 @@ Statistics must be thread-safe.
 
 # 🗄️ Database
 
-The planned persistent database is:
+The persistent database is:
 
-**Supabase PostgreSQL**
+**Cloudflare D1 (SQLite-compatible via HTTP API)**
 
-Possible tables:
+Tables:
 
 ```text
-profiles
+users
 history
 bookmarks
 browser_settings
-```
-
-Optional:
-
-```text
-cache_statistics
+cache_metadata
+statistics
 ```
 
 Architecture:
@@ -471,9 +528,9 @@ Services
       ↓
 Repositories
       ↓
-Database Manager
+Database Manager / D1Client
       ↓
-Supabase PostgreSQL
+Cloudflare D1 REST API
 ```
 
 Repositories include:
@@ -663,7 +720,7 @@ The application can calculate:
           Repositories   Authentication
                 │             │
                 ▼             ▼
-        Supabase/PostgreSQL  Firebase
+          Cloudflare D1    Firebase
 ```
 
 ---
@@ -817,7 +874,7 @@ Persistence
 - Cache CRUD
 - TTL
 - Cache statistics
-- PostgreSQL/Supabase
+- Cloudflare D1
 - History repository
 - Bookmark repository
 - Settings repository
@@ -975,7 +1032,7 @@ develop → main
 Never commit:
 
 - API keys
-- Database passwords
+- Database tokens
 - Firebase secrets/configuration containing sensitive credentials
 - User passwords
 - Access tokens
@@ -985,16 +1042,13 @@ Use environment variables.
 Example `.env.example`:
 
 ```env
-SUPABASE_DB_URL=
-SUPABASE_DB_USER=
-SUPABASE_DB_PASSWORD=
+CLOUDFLARE_ACCOUNT_ID=
+CLOUDFLARE_API_TOKEN=
+D1_DATABASE_ID=
 
 FIREBASE_API_KEY=
 FIREBASE_AUTH_DOMAIN=
 FIREBASE_PROJECT_ID=
-FIREBASE_STORAGE_BUCKET=
-FIREBASE_MESSAGING_SENDER_ID=
-FIREBASE_APP_ID=
 ```
 
 The real `.env` should remain local and should be included in `.gitignore`.
@@ -1346,8 +1400,8 @@ The final result should be **one working CacheBrowse application**.
 **Platform:** Desktop  
 **Language:** Java 21  
 **UI:** JavaFX  
-**Database:** Supabase PostgreSQL  
-**Authentication:** Firebase Authentication  
+**Database:** Cloudflare D1  
+**Authentication:** Firebase / Session Authentication  
 **Cache:** Custom LRU + TTL  
 **Networking:** Java HTTP Client  
 **Testing:** JUnit / integration testing  
@@ -1371,4 +1425,19 @@ The final result should be **one working CacheBrowse application**.
 
 The project is under active development.
 
-The architecture and feature list describe the intended final system. Individual backend integrations such as Supabase and Firebase require the team's project credentials/configuration before they can operate against the team's live services.
+The architecture and feature list describe the intended system with Cloudflare D1 database and Firebase/Session authentication.
+
+## Firebase authentication and administrator setup
+
+The React client uses Firebase Authentication for email/password and Google sign-in. Public web configuration is read from the root `.env` by Vite and explicitly limited to the Firebase web config keys; never place an Admin SDK service-account JSON or Cloudflare token in frontend variables. Enable **Email/Password** and **Google** under Firebase Console → Authentication → Sign-in method, and add `localhost` (and `127.0.0.1` if used) under Authentication → Settings → Authorized domains.
+
+The Java API verifies each Firebase ID token with Firebase Admin (`verifyIdToken(token, true)`). Configure Application Default Credentials for the backend using a service-account file kept outside this repository (`GOOGLE_APPLICATION_CREDENTIALS=/secure/path/service-account.json`) or the platform's workload identity. The service account needs Firebase Authentication user read permissions. Without Admin credentials, authentication calls requiring server verification return an unavailable error; the UI does not claim the user is server-verified.
+
+To initialize the single administrator safely:
+
+1. Register/sign in the intended administrator with Firebase.
+2. Obtain that account's Firebase UID from Firebase Console → Authentication → Users.
+3. Set `CACHEBROWSE_ADMIN_UID` in the local/deployment environment to that exact UID and restart the Java backend.
+4. The server checks that verified UID on every `/api/admin/*` request. Do not set an email or a client-side role flag as the authorization source.
+
+History, bookmarks, and settings endpoints require a Firebase ID token and use the verified UID as the D1 owner. User-directory data in the admin UI comes from Firebase Admin and excludes passwords, tokens, and browsing history. D1 may remain in explicit fallback mode if its own credentials or connectivity are unavailable.

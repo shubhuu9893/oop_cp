@@ -1,51 +1,756 @@
-/* Styles for CacheBrowse application */
+/* ========================================== */
+/* CacheBrowse - Modern Browser UI Stylesheet */
+/* ========================================== */
+
+/* CSS Variables - Design Tokens */
 .root {
-    -fx-font-family: "Segoe UI", Arial, sans-serif;
-    -fx-background-color: #0f172a;
+    -fx-font-family: "Inter", "Segoe UI", "San Francisco", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    -fx-font-size: 14px;
+    
+    /* Dark Theme Colors */
+    -dark-bg-primary: #0F172A;
+    -dark-bg-secondary: #111827;
+    -dark-bg-tertiary: #1E293B;
+    -dark-bg-elevated: #243047;
+    -dark-border: #334155;
+    -dark-border-subtle: #475569;
+    -dark-text-primary: #F8FAFC;
+    -dark-text-secondary: #94A3B8;
+    -dark-text-muted: #64748B;
+    
+    /* Light Theme Colors */
+    -light-bg-primary: #F8FAFC;
+    -light-bg-secondary: #FFFFFF;
+    -light-bg-tertiary: #F1F5F9;
+    -light-bg-elevated: #FFFFFF;
+    -light-border: #E2E8F0;
+    -light-border-subtle: #CBD5E1;
+    -light-text-primary: #0F172A;
+    -light-text-secondary: #475569;
+    -light-text-muted: #64748B;
+    
+    /* Accent Colors */
+    -accent-primary: #3B82F6;
+    -accent-secondary: #06B6D4;
+    -accent-success: #22C55E;
+    -accent-warning: #F59E0B;
+    -accent-danger: #EF4444;
+    -accent-purple: #8B5CF6;
+    
+    /* Shadows */
+    -shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    -shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    -shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    
+    /* Default to dark theme */
+    -fx-background-color: -dark-bg-primary;
+    -fx-text-fill: -dark-text-primary;
 }
 
-.top-bar {
-    -fx-background-color: #111827;
-    -fx-padding: 10px;
+/* ========================================== */
+/* BROWSER LAYOUT */
+/* ========================================== */
+
+/* Main browser container */
+.browser-root {
+    -fx-background-color: -dark-bg-primary;
+}
+
+/* Browser toolbar */
+.browser-toolbar {
+    -fx-background-color: -dark-bg-secondary;
+    -fx-padding: 8px 16px;
+    -fx-spacing: 12px;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 0 0 1px 0;
+}
+
+/* Navigation section */
+.nav-section {
+    -fx-spacing: 4px;
+}
+
+/* Address bar section */
+.address-section {
     -fx-spacing: 8px;
 }
 
-.button {
-    -fx-background-color: #1e293b;
-    -fx-text-fill: white;
-    -fx-background-radius: 6px;
-    -fx-padding: 8px 14px;
+/* Actions section */
+.actions-section {
+    -fx-spacing: 8px;
 }
 
-.button:hover {
-    -fx-background-color: #334155;
+/* ========================================== */
+/* BUTTONS */
+/* ========================================== */
+
+/* Navigation buttons (back, forward, reload, home) */
+.nav-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -dark-text-secondary;
+    -fx-background-radius: 8px;
+    -fx-padding: 8px;
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+    -fx-max-width: 36px;
+    -fx-max-height: 36px;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
 }
 
-.text-field {
-    -fx-background-color: #1e293b;
-    -fx-text-fill: white;
-    -fx-prompt-text-fill: #94a3b8;
-    -fx-background-radius: 6px;
-    -fx-border-color: #475569;
-    -fx-border-radius: 6px;
+.nav-button:hover {
+    -fx-background-color: -dark-bg-elevated;
+    -fx-text-fill: -dark-text-primary;
 }
+
+.nav-button:pressed {
+    -fx-background-color: -dark-border;
+}
+
+/* Icon buttons (toolbar actions) */
+.icon-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -dark-text-secondary;
+    -fx-background-radius: 8px;
+    -fx-padding: 6px 10px;
+    -fx-min-height: 32px;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+}
+
+.icon-button:hover {
+    -fx-background-color: -dark-bg-elevated;
+    -fx-text-fill: -dark-text-primary;
+}
+
+.icon-button:pressed {
+    -fx-background-color: -dark-border;
+}
+
+/* Primary button */
+.primary-button {
+    -fx-background-color: -accent-primary;
+    -fx-text-fill: white;
+    -fx-background-radius: 8px;
+    -fx-padding: 8px 16px;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+    -fx-font-weight: 500;
+}
+
+.primary-button:hover {
+    -fx-background-color: #2563EB;
+}
+
+.primary-button:pressed {
+    -fx-background-color: #1D4ED8;
+}
+
+/* Secondary button */
+.secondary-button {
+    -fx-background-color: -dark-bg-tertiary;
+    -fx-text-fill: -dark-text-primary;
+    -fx-background-radius: 8px;
+    -fx-padding: 8px 16px;
+    -fx-cursor: hand;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-font-weight: 500;
+}
+
+.secondary-button:hover {
+    -fx-background-color: -dark-bg-elevated;
+    -fx-border-color: -dark-border-subtle;
+}
+
+/* Toggle button (active state) */
+.toggle-button-active {
+    -fx-background-color: #22C55E;
+    -fx-text-fill: white;
+    -fx-background-radius: 8px;
+    -fx-padding: 6px 12px;
+    -fx-cursor: hand;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.toggle-button-active:hover {
+    -fx-background-color: #16A34A;
+}
+
+/* Toggle button (inactive state) */
+.toggle-button-inactive {
+    -fx-background-color: -accent-danger;
+    -fx-text-fill: white;
+    -fx-background-radius: 8px;
+    -fx-padding: 6px 12px;
+    -fx-cursor: hand;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.toggle-button-inactive:hover {
+    -fx-background-color: #DC2626;
+}
+
+/* Shield/Protection button */
+.shield-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -accent-secondary;
+    -fx-background-radius: 8px;
+    -fx-padding: 6px 10px;
+    -fx-cursor: hand;
+    -fx-border-color: -accent-secondary;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.shield-button:hover {
+    -fx-background-color: -accent-secondary;
+    -fx-text-fill: white;
+}
+
+/* ========================================== */
+/* ADDRESS BAR */
+/* ========================================== */
+
+.address-bar {
+    -fx-background-color: -dark-bg-tertiary;
+    -fx-text-fill: -dark-text-primary;
+    -fx-prompt-text-fill: -dark-text-muted;
+    -fx-background-radius: 10px;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 1px;
+    -fx-border-radius: 10px;
+    -fx-padding: 10px 16px;
+    -fx-font-size: 14px;
+    -fx-pref-height: 42px;
+}
+
+.address-bar:focused {
+    -fx-border-color: -accent-primary;
+    -fx-background-color: -dark-bg-secondary;
+    -fx-effect: dropshadow(gaussian, rgba(59, 130, 246, 0.3), 6, 0, 0, 0);
+}
+
+.address-bar:hover {
+    -fx-border-color: -dark-border-subtle;
+}
+
+/* ========================================== */
+/* TABS */
+/* ========================================== */
 
 .tab-pane {
-    -fx-background-color: #0f172a;
+    -fx-background-color: -dark-bg-secondary;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.tab-pane .tab-header-area {
+    -fx-padding: 0 16px;
+    -fx-background-color: -dark-bg-secondary;
+}
+
+.tab-pane .tab-header-background {
+    -fx-background-color: -dark-bg-secondary;
 }
 
 .tab {
-    -fx-background-color: #1e293b;
+    -fx-background-color: transparent;
+    -fx-background-radius: 8px 8px 0 0;
+    -fx-padding: 8px 16px;
+    -fx-border-color: transparent;
 }
 
-.tab-label {
+.tab:selected {
+    -fx-background-color: -dark-bg-primary;
+    -fx-border-color: -accent-primary;
+    -fx-border-width: 0 0 2px 0;
+}
+
+.tab .tab-label {
+    -fx-text-fill: -dark-text-secondary;
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+}
+
+.tab:selected .tab-label {
+    -fx-text-fill: -dark-text-primary;
+}
+
+.tab:hover {
+    -fx-background-color: -dark-bg-elevated;
+}
+
+.tab:hover .tab-label {
+    -fx-text-fill: -dark-text-primary;
+}
+
+.tab .tab-close-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -dark-text-muted;
+    -fx-background-radius: 4px;
+    -fx-padding: 2px;
+    -fx-cursor: hand;
+}
+
+.tab .tab-close-button:hover {
+    -fx-background-color: -accent-danger;
     -fx-text-fill: white;
 }
 
-.label {
-    -fx-text-fill: white;
+/* ========================================== */
+/* STATUS BAR */
+/* ========================================== */
+
+.status-bar {
+    -fx-background-color: -dark-bg-secondary;
+    -fx-padding: 6px 16px;
+    -fx-spacing: 16px;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 1px 0 0 0;
+}
+
+.status-item {
+    -fx-text-fill: -dark-text-secondary;
+    -fx-font-size: 12px;
+    -fx-font-weight: 500;
+}
+
+.status-item-success {
+    -fx-text-fill: -accent-success;
+}
+
+.status-item-primary {
+    -fx-text-fill: -accent-primary;
+}
+
+.status-item-secondary {
+    -fx-text-fill: -accent-secondary;
+}
+
+.status-item-warning {
+    -fx-text-fill: -accent-warning;
+}
+
+/* ========================================== */
+/* WEBVIEW CONTAINER */
+/* ========================================== */
+
+.webview-container {
+    -fx-background-color: -dark-bg-primary;
+    /* NO EFFECTS OR CLIPS ON WEBVIEW */
 }
 
 .web-view {
     -fx-background-color: white;
+    /* Keep WebView simple to prevent rendering issues */
+}
+
+/* ========================================== */
+/* DIALOGS AND POPUPS */
+/* ========================================== */
+
+/* Login Dialog */
+.auth-dialog {
+    -fx-background-color: -dark-bg-secondary;
+    -fx-background-radius: 16px;
+    -fx-padding: 32px;
+    -fx-spacing: 24px;
+    -fx-effect: -shadow-lg;
+}
+
+.auth-title {
+    -fx-text-fill: -dark-text-primary;
+    -fx-font-size: 24px;
+    -fx-font-weight: 700;
+}
+
+.auth-subtitle {
+    -fx-text-fill: -dark-text-secondary;
+    -fx-font-size: 16px;
+    -fx-font-weight: 400;
+}
+
+.auth-field {
+    -fx-background-color: -dark-bg-tertiary;
+    -fx-text-fill: -dark-text-primary;
+    -fx-prompt-text-fill: -dark-text-muted;
+    -fx-background-radius: 8px;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-padding: 12px 16px;
+    -fx-font-size: 14px;
+    -fx-pref-height: 44px;
+}
+
+.auth-field:focused {
+    -fx-border-color: -accent-primary;
+    -fx-background-color: -dark-bg-primary;
+}
+
+/* ========================================== */
+/* CARDS AND PANELS */
+/* ========================================== */
+
+.card {
+    -fx-background-color: -dark-bg-tertiary;
+    -fx-background-radius: 12px;
+    -fx-padding: 20px;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+    -fx-effect: -shadow-sm;
+}
+
+.card-title {
+    -fx-text-fill: -dark-text-primary;
+    -fx-font-size: 18px;
+    -fx-font-weight: 600;
+}
+
+.card-subtitle {
+    -fx-text-fill: -dark-text-secondary;
+    -fx-font-size: 14px;
+}
+
+.card-value {
+    -fx-text-fill: -accent-primary;
+    -fx-font-size: 24px;
+    -fx-font-weight: 700;
+}
+
+.card-metric {
+    -fx-text-fill: -accent-success;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+/* Dashboard card variants */
+.dashboard-card-primary {
+    -fx-border-color: -accent-primary;
+}
+
+.dashboard-card-success {
+    -fx-border-color: -accent-success;
+}
+
+.dashboard-card-secondary {
+    -fx-border-color: -accent-secondary;
+}
+
+.dashboard-card-warning {
+    -fx-border-color: -accent-warning;
+}
+
+/* ========================================== */
+/* NEW TAB PAGE */
+/* ========================================== */
+
+.new-tab-container {
+    -fx-background-color: -dark-bg-primary;
+    -fx-padding: 40px 20px;
+    -fx-spacing: 32px;
+    -fx-alignment: center;
+}
+
+.new-tab-title {
+    -fx-text-fill: -dark-text-primary;
+    -fx-font-size: 32px;
+    -fx-font-weight: 700;
+    -fx-text-alignment: center;
+}
+
+.new-tab-subtitle {
+    -fx-text-fill: -dark-text-secondary;
+    -fx-font-size: 16px;
+    -fx-text-alignment: center;
+}
+
+.new-tab-search {
+    -fx-background-color: -dark-bg-tertiary;
+    -fx-text-fill: -dark-text-primary;
+    -fx-prompt-text-fill: -dark-text-muted;
+    -fx-background-radius: 12px;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+    -fx-padding: 16px 20px;
+    -fx-font-size: 16px;
+    -fx-pref-height: 52px;
+    -fx-pref-width: 500px;
+}
+
+.new-tab-search:focused {
+    -fx-border-color: -accent-primary;
+    -fx-effect: dropshadow(gaussian, rgba(59, 130, 246, 0.3), 8, 0, 0, 0);
+}
+
+/* Shortcut tiles */
+.shortcut-container {
+    -fx-spacing: 16px;
+}
+
+.shortcut-tile {
+    -fx-background-color: -dark-bg-tertiary;
+    -fx-text-fill: -dark-text-primary;
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+    -fx-background-radius: 10px;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 1px;
+    -fx-border-radius: 10px;
+    -fx-padding: 12px 16px;
+    -fx-cursor: hand;
+    -fx-min-width: 100px;
+    -fx-alignment: center;
+}
+
+.shortcut-tile:hover {
+    -fx-background-color: -dark-bg-elevated;
+    -fx-border-color: -accent-primary;
+    -fx-text-fill: -accent-primary;
+}
+
+/* ========================================== */
+/* LISTS AND ITEMS */
+/* ========================================== */
+
+.list-view {
+    -fx-background-color: -dark-bg-tertiary;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+
+.list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -dark-text-primary;
+    -fx-padding: 12px 16px;
+}
+
+.list-cell:filled:selected {
+    -fx-background-color: -accent-primary;
+    -fx-text-fill: white;
+}
+
+.list-cell:filled:hover {
+    -fx-background-color: -dark-bg-elevated;
+}
+
+/* ========================================== */
+/* LABELS AND TEXT */
+/* ========================================== */
+
+.label {
+    -fx-text-fill: -dark-text-primary;
+    -fx-font-weight: 400;
+}
+
+.label-secondary {
+    -fx-text-fill: -dark-text-secondary;
+}
+
+.label-muted {
+    -fx-text-fill: -dark-text-muted;
+}
+
+.heading-1 {
+    -fx-font-size: 24px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -dark-text-primary;
+}
+
+.heading-2 {
+    -fx-font-size: 20px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -dark-text-primary;
+}
+
+.heading-3 {
+    -fx-font-size: 16px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -dark-text-primary;
+}
+
+/* ========================================== */
+/* USER PROFILE MENU */
+/* ========================================== */
+
+.profile-button {
+    -fx-background-color: -dark-bg-tertiary;
+    -fx-text-fill: -dark-text-primary;
+    -fx-background-radius: 20px;
+    -fx-padding: 6px 12px;
+    -fx-cursor: hand;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 1px;
+    -fx-border-radius: 20px;
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+}
+
+.profile-button:hover {
+    -fx-background-color: -dark-bg-elevated;
+    -fx-border-color: -accent-primary;
+}
+
+/* ========================================== */
+/* ANIMATIONS AND TRANSITIONS */
+/* ========================================== */
+
+.fade-transition {
+    -fx-opacity: 1.0;
+}
+
+.fade-transition:hover {
+    -fx-opacity: 0.8;
+}
+
+/* Button press animation */
+.button-press {
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+}
+
+/* ========================================== */
+/* TOOLTIPS */
+/* ========================================== */
+
+.tooltip {
+    -fx-background-color: -dark-bg-elevated;
+    -fx-text-fill: -dark-text-primary;
+    -fx-background-radius: 6px;
+    -fx-padding: 6px 10px;
+    -fx-font-size: 12px;
+    -fx-font-weight: 500;
+    -fx-border-color: -dark-border;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+    -fx-effect: -shadow-md;
+}
+
+/* ========================================== */
+/* LIGHT THEME OVERRIDES */
+/* ========================================== */
+
+.light-theme {
+    -fx-background-color: -light-bg-primary;
+    -fx-text-fill: -light-text-primary;
+}
+
+.light-theme .browser-root {
+    -fx-background-color: -light-bg-primary;
+}
+
+.light-theme .browser-toolbar {
+    -fx-background-color: -light-bg-secondary;
+    -fx-border-color: -light-border;
+}
+
+.light-theme .nav-button {
+    -fx-text-fill: -light-text-secondary;
+}
+
+.light-theme .nav-button:hover {
+    -fx-background-color: -light-bg-tertiary;
+    -fx-text-fill: -light-text-primary;
+}
+
+.light-theme .icon-button {
+    -fx-text-fill: -light-text-secondary;
+}
+
+.light-theme .icon-button:hover {
+    -fx-background-color: -light-bg-tertiary;
+    -fx-text-fill: -light-text-primary;
+}
+
+.light-theme .address-bar {
+    -fx-background-color: -light-bg-secondary;
+    -fx-text-fill: -light-text-primary;
+    -fx-prompt-text-fill: -light-text-muted;
+    -fx-border-color: -light-border;
+}
+
+.light-theme .address-bar:focused {
+    -fx-border-color: -accent-primary;
+    -fx-background-color: -light-bg-primary;
+}
+
+.light-theme .tab-pane {
+    -fx-background-color: -light-bg-secondary;
+    -fx-border-color: -light-border;
+}
+
+.light-theme .tab {
+    -fx-background-color: transparent;
+}
+
+.light-theme .tab:selected {
+    -fx-background-color: -light-bg-primary;
+}
+
+.light-theme .tab .tab-label {
+    -fx-text-fill: -light-text-secondary;
+}
+
+.light-theme .tab:selected .tab-label {
+    -fx-text-fill: -light-text-primary;
+}
+
+.light-theme .status-bar {
+    -fx-background-color: -light-bg-secondary;
+    -fx-border-color: -light-border;
+}
+
+.light-theme .status-item {
+    -fx-text-fill: -light-text-secondary;
+}
+
+.light-theme .card {
+    -fx-background-color: -light-bg-secondary;
+    -fx-border-color: -light-border;
+}
+
+.light-theme .new-tab-container {
+    -fx-background-color: -light-bg-primary;
+}
+
+.light-theme .shortcut-tile {
+    -fx-background-color: -light-bg-secondary;
+    -fx-text-fill: -light-text-primary;
+    -fx-border-color: -light-border;
+}
+
+/* ========================================== */
+/* RESPONSIVE ADJUSTMENTS */
+/* ========================================== */
+
+.compact-mode .browser-toolbar {
+    -fx-padding: 4px 12px;
+}
+
+.compact-mode .nav-button {
+    -fx-min-width: 32px;
+    -fx-min-height: 32px;
+    -fx-max-width: 32px;
+    -fx-max-height: 32px;
+}
+
+.compact-mode .address-bar {
+    -fx-pref-height: 36px;
+    -fx-padding: 8px 12px;
 }

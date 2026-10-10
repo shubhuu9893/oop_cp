@@ -1,0 +1,52 @@
+.address-bar {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  background: color-mix(in srgb, var(--bg-surface) 88%, #000 12%);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  padding: 0 11px;
+  height: 36px;
+  gap: 9px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+  min-width: 0;
+}
+.address-bar.focused {
+  border-color: color-mix(in srgb, var(--accent-primary) 72%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 16%, transparent);
+}
+.address-bar:hover:not(.focused) { background: var(--bg-surface); }
+
+.address-bar__security {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 4px;
+  transition: color var(--transition-fast);
+}
+.address-bar__security:hover { color: var(--text-secondary); }
+
+.address-bar__input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  letter-spacing: 0.01em;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+.address-bar__input::placeholder { color: var(--text-muted); }
+.address-bar__input::-webkit-input-placeholder { color: var(--text-muted); }
+
+.address-bar__go {
+  color: var(--accent-primary);
+  font-size: 16px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background var(--transition-fast);
+}
+.address-bar__go:hover { background: rgba(59,130,246,.15); }

@@ -4,34 +4,37 @@ import java.util.HashMap;
 import java.util.function.Consumer;
 
 /**
- * A simple LRU cache implemented with a HashMap and doubly‑linked list.
+ * A custom LRU (Least Recently Used) cache implemented with HashMap and Doubly-Linked List.
+ * Provides O(1) time complexity for get(), put(), remove(), and contains().
+ * Thread-safe with synchronized operations.
  */
 public class LRUCache implements Cache<String, CacheEntry> {
-    private final int capacity;
+    private int capacity;
     private final HashMap<String, Node> map = new HashMap<>();
 
-    // head is most recently used, tail is least
+    // Head is most recently used, tail is least recently used
     private Node head, tail;
 
-    // Count evictions performed when capacity is exceeded.
+    // Counter for evictions performed when capacity is exceeded
     private int evictions = 0;
 
     /** Optional callback invoked whenever an entry is evicted. */
     private Consumer<CacheEntry> evictionListener;
 
     public LRUCache(int capacity) {
-        this.capacity = capacity;
+        this.capacity = Math.max(1, capacity);
     }
 
-    /** Set a listener that will be notified when an entry is evicted.
-     *  The listener may be {@code null} to disable callbacks.
+    /**
+     * Set a listener that will be notified when an entry is evicted.
      */
-    public void setEvictionListener(Consumer<CacheEntry> listener) {
+    public synchronized void setEvictionListener(Consumer<CacheEntry> listener) {
         this.evictionListener = listener;
     }
 
     @Override
     public synchronized CacheEntry get(String key) {
+        if (key == null) return null;
         Node node = map.get(key);
         if (node == null) return null;
         moveToHead(node);
@@ -40,6 +43,8 @@ public class LRUCache implements Cache<String, CacheEntry> {
 
     @Override
     public synchronized void put(String key, CacheEntry value) {
+        if (key == null || value == null) return;
+
         Node node = map.get(key);
         if (node != null) {
             node.value = value;
@@ -48,26 +53,34 @@ public class LRUCache implements Cache<String, CacheEntry> {
             node = new Node(value);
             map.put(key, node);
             addToHead(node);
-                if (map.size() > capacity) {
-        // Notify eviction listener before removal
-        if (evictionListener != null && tail != null) {
-            try {
-                evictionListener.accept(tail.value);
-            } catch (Exception e) {
-                // Swallow exceptions to avoid corrupting cache state.
-            }
-        }
-        removeTail();
-        evictions++;
+
+            while (map.size() > capacity && tail != null) {
+                if (evictionListener != null) {
+                    try {
+                        evictionListener.accept(tail.value);
+                    } catch (Exception ignored) {
+                    }
                 }
+                removeTail();
+                evictions++;
+            }
         }
     }
 
     @Override
-    public synchronized boolean contains(String key) { return map.containsKey(key); }
+    public synchronized boolean contains(String key) {
+        if (key == null) return false;
+        return map.containsKey(key);
+    }
 
     @Override
-    public synchronized void remove(String key) { deleteNode(map.remove(key)); }
+    public synchronized void remove(String key) {
+        if (key == null) return;
+        Node node = map.remove(key);
+        if (node != null) {
+            deleteNode(node);
+        }
+    }
 
     @Override
     public synchronized void clear() {
@@ -76,14 +89,51 @@ public class LRUCache implements Cache<String, CacheEntry> {
         map.clear();
     }
 
-     @Override
-     public int size() { return map.size(); }
+    @Override
+    public synchronized int size() {
+        return map.size();
+    }
 
-     @Override
-     public int capacity() { return capacity; }
+    /** Removes expired entries without treating maintenance as browser requests. */
+    public synchronized int removeExpired() {
+        int removed = 0;
+        Node node = tail;
+        while (node != null) {
+            Node previous = node.prev;
+            if (node.value.isExpired()) {
+                map.remove(node.value.getKey());
+                deleteNode(node);
+                removed++;
+            }
+            node = previous;
+        }
+        return removed;
+    }
 
-     /** Return number of evictions performed */
-     public int getEvictions() { return evictions; }
+    @Override
+    public synchronized int capacity() {
+        return capacity;
+    }
+
+    public synchronized void setCapacity(int newCapacity) {
+        if (newCapacity > 0) {
+            this.capacity = newCapacity;
+            while (map.size() > capacity && tail != null) {
+                if (evictionListener != null) {
+                    try {
+                        evictionListener.accept(tail.value);
+                    } catch (Exception ignored) {
+                    }
+                }
+                removeTail();
+                evictions++;
+            }
+        }
+    }
+
+    public synchronized int getEvictions() {
+        return evictions;
+    }
 
     private void moveToHead(Node node) {
         deleteNode(node);
@@ -92,17 +142,30 @@ public class LRUCache implements Cache<String, CacheEntry> {
 
     private void addToHead(Node node) {
         node.next = head;
-        if (head != null) head.prev = node;
+        node.prev = null;
+        if (head != null) {
+            head.prev = node;
+        }
         head = node;
-        if (tail == null) tail = head;
+        if (tail == null) {
+            tail = head;
+        }
     }
 
     private void deleteNode(Node node) {
         if (node == null) return;
-        if (node.prev != null) node.prev.next = node.next;
-        else head = node.next;
-        if (node.next != null) node.next.prev = node.prev;
-        else tail = node.prev;
+        if (node.prev != null) {
+            node.prev.next = node.next;
+        } else {
+            head = node.next;
+        }
+        if (node.next != null) {
+            node.next.prev = node.prev;
+        } else {
+            tail = node.prev;
+        }
+        node.prev = null;
+        node.next = null;
     }
 
     private void removeTail() {
@@ -111,7 +174,6 @@ public class LRUCache implements Cache<String, CacheEntry> {
         deleteNode(tail);
     }
 
-    /** Node for doubly linked list */
     private static class Node {
         CacheEntry value;
         Node prev, next;

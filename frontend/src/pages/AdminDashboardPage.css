@@ -1,0 +1,19 @@
+.admin-page { height: 100%; overflow: auto; padding: 30px clamp(20px, 4vw, 56px); color: var(--text-primary); }
+.admin-page__header { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:22px; }
+.admin-page__header h1 { font-size:20px; margin:0 0 5px; }
+.admin-page__header p,.admin-page__pagination span { color:var(--text-muted); font-size:12px; margin:0; }
+.admin-page__refresh,.admin-page__pagination button { background:var(--bg-elevated); color:var(--text-primary); border:1px solid var(--border); border-radius:7px; padding:8px 12px; }
+.admin-page__refresh:disabled,.admin-page__pagination button:disabled { opacity:.5; cursor:not-allowed; }
+.admin-page__summary { display:flex; align-items:center; justify-content:space-between; max-width:340px; padding:14px 16px; margin-bottom:18px; border:1px solid var(--border); border-radius:8px; background:var(--bg-surface); color:var(--text-secondary); font-size:13px; }
+.admin-page__summary strong { color:var(--text-primary); font-size:21px; }
+.admin-page__tools input { width:min(420px,100%); margin-bottom:14px; background:var(--bg-surface); color:var(--text-primary); border:1px solid var(--border); border-radius:7px; padding:9px 11px; }
+.admin-page__table-wrap { overflow:auto; border:1px solid var(--border); border-radius:8px; }
+.admin-page table { width:100%; border-collapse:collapse; text-align:left; font-size:12px; }
+.admin-page th,.admin-page td { padding:10px 12px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.admin-page th { color:var(--text-muted); font-weight:600; background:var(--bg-surface); }
+.admin-page td { color:var(--text-secondary); }
+.admin-page__uid { font-family:monospace; }
+.admin-page__pagination { display:flex; justify-content:flex-end; align-items:center; gap:14px; padding:14px 0; }
+.admin-page__state,.admin-page__error { padding:16px; font-size:13px; }
+.admin-page__state { color:var(--text-muted); }
+.admin-page__error { color:var(--accent-danger); background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2); border-radius:7px; }

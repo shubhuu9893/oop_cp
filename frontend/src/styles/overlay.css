@@ -1,0 +1,47 @@
+html:has(.native-popup-overlay),
+body:has(.native-popup-overlay),
+body:has(.native-popup-overlay) #root {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent !important;
+}
+
+.native-popup-overlay {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.native-popup-overlay__panel {
+  position: absolute;
+  overflow: auto;
+  color: var(--text-primary);
+  box-sizing: border-box;
+  animation: native-popup-in 100ms ease-out;
+}
+
+.native-popup-overlay__panel.user-dropdown { width: min(220px, calc(100vw - 16px)); }
+.native-popup-overlay__panel.protection-popup { width: min(280px, calc(100vw - 16px)); }
+.native-popup-overlay__panel.bookmarks-popover { width: min(380px, calc(100vw - 16px)); }
+.native-popup-overlay__panel.bookmark-context-menu { min-width: 160px; width: max-content; }
+
+.bookmark-editor-native { width: 100%; color: var(--text-primary); }
+.bookmark-editor-native header, .bookmark-editor-native footer { display: flex; align-items: center; gap: 8px; }
+.bookmark-editor-native header { justify-content: space-between; margin-bottom: 14px; font-size: 13px; }
+.bookmark-editor-native header button { color: var(--text-muted); }
+.bookmark-editor-native label { display: flex; flex-direction: column; gap: 5px; margin: 10px 0; color: var(--text-secondary); font-size: 11px; }
+.bookmark-editor-native label input, .bookmark-editor-native label select { width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: 12px; }
+.bookmark-editor-native footer { margin-top: 16px; }
+.bookmark-editor-native footer span { flex: 1; }
+.bookmark-editor-native footer button { padding: 7px 10px; border-radius: 5px; color: var(--text-secondary); font-size: 11px; }
+.bookmark-editor-native footer .bookmark-editor__save { background: var(--accent-primary); color: white; }
+.bookmark-editor-native footer .bookmark-editor__remove { margin-right: auto; color: var(--accent-danger); }
+
+@keyframes native-popup-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}

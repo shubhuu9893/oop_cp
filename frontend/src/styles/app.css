@@ -1,0 +1,92 @@
+.cb-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.cb-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  position: relative;
+}
+
+.auth-overlay { position: fixed; inset: 0; z-index: 6000; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,.66); backdrop-filter: blur(3px); }
+.auth-overlay .login-page { width: min(100%, 520px); min-height: 0; padding: 28px; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 20px 80px rgba(0,0,0,.5); }
+.auth-overlay .login-bg { border-radius: inherit; }
+.auth-overlay__close { position: absolute; z-index: 2; top: max(16px, calc(50% - 300px)); right: max(16px, calc(50% - 245px)); width: 32px; height: 32px; border-radius: 6px; color: var(--text-secondary); font-size: 22px; }
+.auth-overlay__close:hover { color: var(--text-primary); background: rgba(255,255,255,.08); }
+
+.runtime-unavailable {
+  max-width: 560px;
+  margin: auto;
+  padding: 32px;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.runtime-unavailable h1 { margin-bottom: 12px; font-size: 20px; }
+.runtime-unavailable p { margin: 8px 0; color: var(--text-secondary); }
+.runtime-unavailable code {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.browser-viewport {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-primary);
+}
+
+.web-mode-notice {
+  width: min(600px, calc(100% - 40px));
+  margin: auto;
+  padding: 30px;
+  color: var(--text-primary);
+  text-align: center;
+}
+.web-mode-notice__icon { display: grid; place-items: center; width: 42px; height: 42px; margin: 0 auto 18px; border: 1px solid var(--border); border-radius: 50%; color: var(--accent-primary); font-size: 22px; }
+.web-mode-notice h1 { margin: 0 0 12px; font-size: 20px; }
+.web-mode-notice p { margin: 10px 0; color: var(--text-secondary); line-height: 1.55; }
+.web-mode-notice__url { overflow-wrap: anywhere; color: var(--text-muted) !important; font-size: 12px; }
+.web-mode-notice__open { display: inline-block; margin: 10px 0; padding: 9px 15px; border-radius: var(--radius-sm); background: var(--accent-primary); color: #fff; text-decoration: none; }
+.web-mode-notice__open:hover { filter: brightness(1.08); }
+.web-mode-notice__note { font-size: 12px; }
+
+.page-error {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 32px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  text-align: center;
+}
+
+.page-error p { max-width: 620px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.page-error button {
+  margin: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--accent-primary);
+  color: white;
+}
+.page-error button.secondary { background: var(--bg-surface); color: var(--text-primary); }
+
+/* Utility used in DashboardPage etc. */
+.dash-btn { /* already defined in DashboardPage.css, duplicated here for shared use */ }

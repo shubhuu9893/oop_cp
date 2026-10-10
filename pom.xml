@@ -18,11 +18,6 @@
         TTL and ad/tracker blocking.
     </description>
 
-    <!-- Plugin groups for prefix resolution -->
-    <pluginGroups>
-        <pluginGroup>org.openjfx</pluginGroup>
-    </pluginGroups>
-
     <!-- Properties -->
     <properties>
 
@@ -30,11 +25,14 @@
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <!-- JavaFX -->
+        <!-- JavaFX (kept for legacy ui/ classes that still compile against it) -->
         <javafx.version>21.0.8</javafx.version>
 
-        <!-- Application -->
+        <!-- JavaFX launcher — kept for `mvn javafx:run` if ever needed separately -->
         <main.class>com.cachebrowse.ui.BrowserApplication</main.class>
+
+        <!-- Backend entry point — used by `mvn exec:java` -->
+        <backend.main.class>com.cachebrowse.backend.CacheBrowseBackendApplication</backend.main.class>
 
     </properties>
 
@@ -103,6 +101,13 @@
             <version>2.17.0</version>
         </dependency>
 
+        <!-- Firebase Admin: trusted verification of ID tokens and user directory access. -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.4.3</version>
+        </dependency>
+
         <!-- JUnit for tests -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -146,6 +151,41 @@
                 </configuration>
             </plugin>
 
+            <!-- ============================================================ -->
+            <!-- exec-maven-plugin — starts the Java backend WITHOUT JavaFX.  -->
+            <!-- Usage: mvn exec:java                                          -->
+            <!-- ============================================================ -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <!-- Pure Java backend — no JavaFX Application.launch() -->
+                    <mainClass>${backend.main.class}</mainClass>
+                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
+                    <jvmArgs>
+                        <!-- Memory settings suitable for the backend services -->
+                        <jvmArg>-Xmx512m</jvmArg>
+                        <jvmArg>-Xms128m</jvmArg>
+                        <!-- G1GC for low-latency API responses -->
+                        <jvmArg>-XX:+UseG1GC</jvmArg>
+                        <jvmArg>-XX:MaxGCPauseMillis=100</jvmArg>
+                        <!-- Silence JavaFX Prism warnings (JavaFX jars are on classpath
+                             but we never initialize the JavaFX toolkit) -->
+                        <jvmArg>-Djava.awt.headless=true</jvmArg>
+                        <jvmArg>-Dprism.order=sw</jvmArg>
+                        <jvmArg>-Djavafx.headless=true</jvmArg>
+                    </jvmArgs>
+                </configuration>
+            </plugin>
+
+
+            <!-- Surefire: JUnit 5 / Jupiter support -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
 
             <!-- JavaFX Maven Plugin -->
             <plugin>
@@ -155,6 +195,26 @@
 
                 <configuration>
                     <mainClass>${main.class}</mainClass>
+                    <options>
+                        <!-- Stabilize Prism/WebView rendering on Linux.
+                             Prevents the WCPageBackBufferImpl.validate / RTTexture null
+                             texture crash by disabling GPU-side back-buffer invalidation
+                             and forcing a more conservative rendering pipeline. -->
+                        <option>-Dprism.vsync=true</option>
+                        <option>-Djavafx.animation.pulse=60</option>
+                        <option>-Dprism.dirtyopts=false</option>
+                        <!-- Disable WebKit media resource warnings that cause log noise -->
+                        <option>-Dcom.sun.webkit.network.URLs.suppressTLSErrors=true</option>
+                        <!-- Increase JavaFX media buffer for smoother video playback.
+                             Default is small; this gives the media pipeline more headroom. -->
+                        <option>-Djavafx.media.jfxmedia.enabled=true</option>
+                        <!-- Ensure JavaFX uses enough memory for video rendering textures -->
+                        <option>-Xmx512m</option>
+                        <option>-Xms128m</option>
+                        <!-- Reduce GC pause impact on the rendering thread -->
+                        <option>-XX:+UseG1GC</option>
+                        <option>-XX:MaxGCPauseMillis=50</option>
+                    </options>
                 </configuration>
 
             </plugin>

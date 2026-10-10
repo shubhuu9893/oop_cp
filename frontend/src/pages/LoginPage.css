@@ -1,0 +1,127 @@
+.login-page {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  padding: 24px;
+}
+.login-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(59,130,246,.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.login-card {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.login-brand__icon {
+  width: 56px; height: 56px;
+  border-radius: var(--radius-lg);
+  background: rgba(6,182,212,.12);
+  border: 1px solid rgba(6,182,212,.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-brand__name {
+  font-size: 22px; font-weight: 700;
+  color: var(--text-primary); letter-spacing: -0.02em;
+}
+.login-brand__sub { font-size: 13px; color: var(--text-muted); }
+
+.login-form {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.login-form__title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+
+.login-field { display: flex; flex-direction: column; gap: 6px; }
+.login-field__label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.login-field__wrap { position: relative; }
+.login-field__input {
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  display: block;
+}
+.login-field__input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+  outline: none;
+}
+.login-field__input::placeholder { color: var(--text-muted); }
+.login-field__eye {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--text-muted);
+  transition: color var(--transition-fast);
+}
+.login-field__eye:hover { color: var(--text-secondary); }
+
+.login-error {
+  font-size: 12px;
+  color: var(--accent-danger);
+  background: rgba(239,68,68,.1);
+  border: 1px solid rgba(239,68,68,.2);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+.login-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--accent-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background var(--transition-fast);
+}
+.login-submit:hover:not(:disabled) { background: var(--accent-primary-hover); }
+.login-submit:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.login-forgot { align-self:flex-end; margin-top:-9px; color:var(--accent-primary); font-size:12px; }
+.login-forgot:disabled { opacity:.55; cursor:not-allowed; }
+.login-divider { display:flex; align-items:center; gap:12px; color:var(--text-muted); font-size:11px; margin:-4px 0; }
+.login-divider::before,.login-divider::after { content:""; height:1px; flex:1; background:var(--border); }
+.login-google { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:10px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--bg-elevated); color:var(--text-primary); font-size:13px; font-weight:600; }
+.login-google:hover:not(:disabled) { background:var(--bg-hover,var(--bg-surface)); }
+.login-google:disabled { opacity:.65; cursor:not-allowed; }
+.login-notice { font-size:12px; color:var(--accent-success,var(--accent-primary)); }
+.login-forgot:focus-visible,.login-google:focus-visible { outline:2px solid var(--accent-primary); outline-offset:2px; }
+
+.login-switch {
+  font-size: 12px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.login-switch button {
+  color: var(--accent-primary);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

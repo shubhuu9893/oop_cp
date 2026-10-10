@@ -78,7 +78,12 @@ public class CacheManagerTest {
     void testThreadSafety() throws InterruptedException {
         int threadCount = 10;
         ExecutorService pool = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch latch = new CountDownLatch(threadCount * 50);
+        // We only need to wait for each thread to finish its work, so the
+        // latch should be initialized with the number of threads. The test
+        // previously used `threadCount * 50`, which caused the await() call
+        // to block indefinitely because we only counted down once per
+        // thread.
+        CountDownLatch latch = new CountDownLatch(threadCount);
         for (int t = 0; t < threadCount; t++) {
             final int tid = t;
             pool.submit(() -> {

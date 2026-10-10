@@ -1,69 +1,134 @@
 package com.cachebrowse.adblock;
 
-import java.io.BufferedReader;
-import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
- * Very simple ad blocker – holds a set of domain patterns.
- * <p>
- * The blocklist is read from {@code data/adblock_list.txt} if it exists, otherwise
- * the blocker falls back to an internal default list.  Each line in the file can be
- * either a full host (e.g. "ads.google.com") or a wildcard prefixed with '*'.
+ * Ad blocker that blocks URLs matching advertising domains and patterns.
  */
 public class AdBlocker {
-    private final Set<String> blocklist = new HashSet<>();
+    private final BlockList blockList;
+    private volatile boolean enabled = true;
 
     public AdBlocker() {
-        loadDefaultList();
-    }
-
-    /** Load the list from a file or use built‑in defaults */
-    private void loadDefaultList() {
-        try {
-            Path path = Path.of("data", "adblock_list.txt");
-            if (Files.exists(path)) {
-                blocklist.addAll(Files.readAllLines(path)
-                        .stream()
-                        .map(String::trim)
-                        .filter(l -> !l.isEmpty() && !l.startsWith("#"))
-                        .collect(Collectors.toSet()));
-            }
-        } catch (Exception ignored) {
-            // ignore, use defaults
-        }
-
-        // Hardcoded fallback list – keeps the demo functional.
-        blocklist.addAll(Set.of(
+        Set<String> defaultAds = Set.of(
+                // Major ad networks & exchanges
                 "ads.google.com",
                 "doubleclick.net",
+                "*.doubleclick.net",
                 "googlesyndication.com",
-                "adservice.google.com"
-        ));
+                "*.googlesyndication.com",
+                "adservice.google.com",
+                "*.adservice.google.com",
+                "pagead2.googlesyndication.com",
+                "googleadservices.com",
+                "*.googleadservices.com",
+                "adnxs.com",
+                "*.adnxs.com",
+                "advertising.com",
+                "*.advertising.com",
+                "amazon-adsystem.com",
+                "*.amazon-adsystem.com",
+                "criteo.com",
+                "*.criteo.com",
+                "criteo.net",
+                "*.criteo.net",
+                "taboola.com",
+                "*.taboola.com",
+                "outbrain.com",
+                "*.outbrain.com",
+                "rubiconproject.com",
+                "*.rubiconproject.com",
+                "popads.net",
+                "pubmatic.com",
+                "*.pubmatic.com",
+                "openx.net",
+                "*.openx.net",
+                "casale-media.com",
+                "bidswitch.net",
+                "smartadserver.com",
+                "adroll.com",
+                "*.adroll.com",
+                "adtechus.com",
+                "media.net",
+                "*.media.net",
+                "serving-sys.com",
+                "exponential.com",
+                "inmobi.com",
+                "applovin.com",
+                "unityads.unity3d.com",
+                "ironsrc.com",
+                "vungle.com",
+                "chartboost.com",
+                "adcolony.com",
+                "revcontent.com",
+                "buysellads.com",
+                "zedo.com",
+                "adblade.com",
+                "chitika.com",
+                "mgid.com",
+                "propellerads.com",
+                "adsterra.com",
+                "exoclick.com",
+                "trafficjunky.com",
+                "juicyads.com",
+                "zergnet.com",
+                "yandexadexchange.net",
+                "aniview.com",
+                "teads.tv",
+                "*.teads.tv",
+                "sharethrough.com",
+                "sovrn.com",
+                "yieldmo.com",
+                "gumgum.com",
+                "triplelift.com",
+                "undertone.com",
+                "connatix.com",
+                "spotxchange.com",
+                "spotx.tv",
+                "adform.net",
+                "adzerk.net",
+                // Specific ad path patterns
+                "/pagead/",
+                "/adservice/",
+                "/ads/sponsor",
+                "/ad_tag",
+                "doubleclick.net/gampad/"
+        );
+        this.blockList = new BlockList("data/adblock_rules.txt", defaultAds);
     }
 
-    /** Return true if the given URL matches a blocked domain */
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
     public boolean isAdBlocked(String url) {
-        try {
-            URI uri = URI.create(url);
-            String host = uri.getHost();
-            if (host == null) return false;
-            for (String pattern : blocklist) {
-                if (pattern.startsWith("*")) {
-                    // wildcard at the start: ends with
-                    String suffix = pattern.substring(1);
-                    if (host.endsWith(suffix)) return true;
-                } else {
-                    if (host.equalsIgnoreCase(pattern)) return true;
-                }
-            }
-        } catch (Exception e) {
-            // Malformed URL – treat as not blocked.
+        if (!enabled || url == null || url.isBlank()) {
+            return false;
         }
-        return false;
+        return blockList.matches(url);
+    }
+
+    public void addRule(String rule) {
+        blockList.addRule(rule);
+    }
+
+    public void removeRule(String rule) {
+        blockList.removeRule(rule);
+    }
+
+    public void clearRules() {
+        blockList.clearRules();
+    }
+
+    public Set<String> getRules() {
+        return blockList.getRules();
+    }
+
+    public int getRuleCount() {
+        return blockList.size();
     }
 }
