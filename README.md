@@ -12,6 +12,9 @@ npm install
 npm run dev
 ```
 
+Backend Run
+mvn exec:java 
+
 This starts Vite at `http://127.0.0.1:5173`, opens the CacheBrowse Electron window, and starts Java on `http://127.0.0.1:8080` if the API is not already available. Wait for the UI and backend readiness messages in the terminal. Chromium navigation and protection run in the Electron window; merely opening the Vite URL in Chrome is not running CacheBrowse's browser engine.
 
 For individual services, run `mvn -q exec:java` from the repository root to start Java separately, then use `npm run dev:web` in `frontend` for UI-only development. Vite-only mode deliberately does not navigate external pages: a normal web page cannot embed arbitrary cross-origin websites reliably or control another browser's tabs. Use `npm run dev` for actual browsing. `npm run build` builds the React UI for the Electron host; `npm run smoke:desktop` runs the Chromium integration smoke test when the desktop app is already running with remote debugging enabled.
@@ -1427,17 +1430,25 @@ The project is under active development.
 
 The architecture and feature list describe the intended system with Cloudflare D1 database and Firebase/Session authentication.
 
-## Firebase authentication and administrator setup
+## Firebase authentication and private browser data
 
 The React client uses Firebase Authentication for email/password and Google sign-in. Public web configuration is read from the root `.env` by Vite and explicitly limited to the Firebase web config keys; never place an Admin SDK service-account JSON or Cloudflare token in frontend variables. Enable **Email/Password** and **Google** under Firebase Console → Authentication → Sign-in method, and add `localhost` (and `127.0.0.1` if used) under Authentication → Settings → Authorized domains.
 
-The Java API verifies each Firebase ID token with Firebase Admin (`verifyIdToken(token, true)`). Configure Application Default Credentials for the backend using a service-account file kept outside this repository (`GOOGLE_APPLICATION_CREDENTIALS=/secure/path/service-account.json`) or the platform's workload identity. The service account needs Firebase Authentication user read permissions. Without Admin credentials, authentication calls requiring server verification return an unavailable error; the UI does not claim the user is server-verified.
+The Java API verifies each Firebase ID token with Firebase Admin (`verifyIdToken(token, true)`). The web API key and Firebase project ID are public client configuration; they are not server credentials. **The Java verifier additionally requires a service-account credential or supported Google Application Default Credentials (ADC).** The project ID alone, Firebase web API key, and Cloudflare D1 token cannot verify Firebase ID tokens. If the Java backend has no server credential, protected APIs return HTTP 503 and do not accept the request.
 
-To initialize the single administrator safely:
+For local Linux development, download a service-account JSON for the same Firebase project as `FIREBASE_PROJECT_ID` from Firebase Console → Project settings → Service accounts. Keep it outside this repository and restrict its file permissions:
 
-1. Register/sign in the intended administrator with Firebase.
-2. Obtain that account's Firebase UID from Firebase Console → Authentication → Users.
-3. Set `CACHEBROWSE_ADMIN_UID` in the local/deployment environment to that exact UID and restart the Java backend.
-4. The server checks that verified UID on every `/api/admin/*` request. Do not set an email or a client-side role flag as the authorization source.
+```bash
+mkdir -p "$HOME/.config/cachebrowse"
+install -m 600 /path/to/downloaded-service-account.json "$HOME/.config/cachebrowse/firebase-service-account.json"
+```
 
-History, bookmarks, and settings endpoints require a Firebase ID token and use the verified UID as the D1 owner. User-directory data in the admin UI comes from Firebase Admin and excludes passwords, tokens, and browsing history. D1 may remain in explicit fallback mode if its own credentials or connectivity are unavailable.
+Set this path in the root `.env` (the file is Git-ignored), then restart the Java backend:
+
+```dotenv
+GOOGLE_APPLICATION_CREDENTIALS=/home/your-user/.config/cachebrowse/firebase-service-account.json
+```
+
+The backend resolves a relative credential path from the project root, checks that the file is readable, and rejects a service-account project mismatch. Alternatively, configure supported ADC for the Java process. Never put this JSON in `frontend/.env`, a `VITE_` variable, source control, or browser code. `.env.example` contains only a path placeholder. D1 connectivity is independent and still requires its own Cloudflare configuration.
+
+History, bookmarks, and settings endpoints require a Firebase ID token and use the UID from the server-verified token as the D1 owner. Request-supplied UIDs are not used to select another user's records. D1 may remain in explicit fallback mode if its own credentials or connectivity are unavailable.

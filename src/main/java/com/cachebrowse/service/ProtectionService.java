@@ -16,21 +16,38 @@ public final class ProtectionService {
     private final AdBlocker adBlocker;
     private final TrackerBlocker trackerBlocker;
     private final CacheStatistics statistics;
+    private final ProtectionLogService protectionLogService;
     private final Set<String> allowlist = new ConcurrentSkipListSet<>();
     private final Path allowlistFile;
 
     public ProtectionService(AdBlocker adBlocker, TrackerBlocker trackerBlocker,
                              CacheStatistics statistics) {
-        this(adBlocker, trackerBlocker, statistics, Path.of("data", "protection_allowlist.txt"));
+        this(adBlocker, trackerBlocker, statistics, null, Path.of("data", "protection_allowlist.txt"));
+    }
+
+    public ProtectionService(AdBlocker adBlocker, TrackerBlocker trackerBlocker,
+                             CacheStatistics statistics, ProtectionLogService protectionLogService) {
+        this(adBlocker, trackerBlocker, statistics, protectionLogService, Path.of("data", "protection_allowlist.txt"));
     }
 
     public ProtectionService(AdBlocker adBlocker, TrackerBlocker trackerBlocker,
                              CacheStatistics statistics, Path allowlistFile) {
+        this(adBlocker, trackerBlocker, statistics, null, allowlistFile);
+    }
+
+    public ProtectionService(AdBlocker adBlocker, TrackerBlocker trackerBlocker,
+                             CacheStatistics statistics, ProtectionLogService protectionLogService,
+                             Path allowlistFile) {
         this.adBlocker = adBlocker;
         this.trackerBlocker = trackerBlocker;
         this.statistics = statistics;
+        this.protectionLogService = protectionLogService;
         this.allowlistFile = allowlistFile;
         loadAllowlist();
+    }
+
+    public ProtectionLogService getProtectionLogService() {
+        return protectionLogService;
     }
 
     public boolean isAllowed(String url) {
@@ -52,35 +69,39 @@ public final class ProtectionService {
         saveAllowlist();
     }
 
-    public void addBlocklistRule(String category, String rule) {
-        String clean = cleanRule(rule);
-        if (clean == null) throw new IllegalArgumentException("A valid domain or URL pattern is required");
-        switch (category == null ? "" : category.toLowerCase(java.util.Locale.ROOT)) {
-            case "ad", "ads" -> adBlocker.addRule(clean);
-            case "tracker", "trackers" -> trackerBlocker.addRule(clean);
-            default -> throw new IllegalArgumentException("category must be 'ad' or 'tracker'");
-        }
-    }
-
-    public void removeBlocklistRule(String category, String rule) {
-        if (rule == null) return;
-        switch (category == null ? "" : category.toLowerCase(java.util.Locale.ROOT)) {
-            case "ad", "ads" -> adBlocker.removeRule(rule);
-            case "tracker", "trackers" -> trackerBlocker.removeRule(rule);
-            default -> throw new IllegalArgumentException("category must be 'ad' or 'tracker'");
-        }
-    }
-
     public List<String> getAllowlist() { return List.copyOf(allowlist); }
     public List<String> getAdRules() { return adBlocker.getRules().stream().sorted().toList(); }
     public List<String> getTrackerRules() { return trackerBlocker.getRules().stream().sorted().toList(); }
 
     /** Called only after Electron cancels an actual Chromium request. */
     public void recordBlockedRequest(String category) {
+        if (protectionLogService != null) {
+            com.cachebrowse.model.ProtectionEvent ev = new com.cachebrowse.model.ProtectionEvent();
+            ev.setEventType("ad".equalsIgnoreCase(category) ? com.cachebrowse.model.ProtectionEventType.AD : com.cachebrowse.model.ProtectionEventType.TRACKER);
+            ev.setAction(com.cachebrowse.model.ProtectionAction.BLOCKED);
+            ev.setReason("canceled-request");
+            protectionLogService.recordEvent(ev);
+            return;
+        }
         if (statistics == null) return;
         if ("ad".equalsIgnoreCase(category)) statistics.incAdsBlocked();
         else if ("tracker".equalsIgnoreCase(category)) statistics.incTrackersBlocked();
         else throw new IllegalArgumentException("category must be 'ad' or 'tracker'");
+    }
+
+    public com.cachebrowse.model.ProtectionEvent recordEvent(com.cachebrowse.model.ProtectionEvent event) {
+        if (protectionLogService != null) {
+            return protectionLogService.recordEvent(event);
+        }
+        if (event != null && statistics != null) {
+            if (event.getAction() == com.cachebrowse.model.ProtectionAction.BLOCKED) {
+                if (event.getEventType() == com.cachebrowse.model.ProtectionEventType.AD) statistics.incAdsBlocked();
+                else if (event.getEventType() == com.cachebrowse.model.ProtectionEventType.TRACKER) statistics.incTrackersBlocked();
+            } else if (event.getAction() == com.cachebrowse.model.ProtectionAction.ALLOWED) {
+                statistics.incAllowedRequests();
+            }
+        }
+        return event;
     }
 
     private static String cleanRule(String rule) {

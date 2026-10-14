@@ -30,15 +30,9 @@ class HttpApiServerTest {
                 new BrowserSettings(), 0);
         server.setIdentityService(new com.cachebrowse.auth.IdentityVerifier() {
             public com.cachebrowse.auth.FirebaseIdentityService.Principal verify(String token) {
-                if (!token.equals("valid-user") && !token.equals("valid-admin")) throw new IllegalArgumentException();
-                String uid = token.equals("valid-admin") ? "configured-admin" : "ordinary-user";
-                return new com.cachebrowse.auth.FirebaseIdentityService.Principal(uid, uid + "@example.test", "Test", true, "password");
+                if (!token.equals("valid-user")) throw new IllegalArgumentException();
+                return new com.cachebrowse.auth.FirebaseIdentityService.Principal("ordinary-user", "user@example.test", "Test", true, "password");
             }
-            public boolean isAdmin(com.cachebrowse.auth.FirebaseIdentityService.Principal principal) { return principal.uid().equals("configured-admin"); }
-            public com.cachebrowse.auth.FirebaseIdentityService.UserPage listUsers(int size, String cursor) {
-                return new com.cachebrowse.auth.FirebaseIdentityService.UserPage(java.util.List.of(), null);
-            }
-            public java.util.Optional<com.cachebrowse.auth.FirebaseIdentityService.DirectoryUser> getUser(String uid) { return java.util.Optional.empty(); }
         });
         server.start();
     }
@@ -112,18 +106,30 @@ class HttpApiServerTest {
     }
 
     @Test
-    void protectedApiRequiresVerifiedBearerAndAdminRole() throws Exception {
+    void protectedUserApiRequiresVerifiedBearerAndExposesNoAdminPortal() throws Exception {
         HttpResponse<String> anonymous = getWithoutAuth("/api/auth/user");
         assertEquals(401, anonymous.statusCode());
         assertEquals(401, getWithoutAuth("/api/history").statusCode());
         assertEquals(401, getWithoutAuth("/api/settings").statusCode());
         assertEquals(404, post("/api/auth/login", "{\"email\":\"nobody@example.test\",\"password\":\"not-a-real-password\"}").statusCode());
-        assertEquals(403, getAs("/api/admin/summary", "valid-user").statusCode());
-        assertEquals(200, getAs("/api/auth/user", "valid-admin").statusCode());
-        assertTrue(getAs("/api/auth/user", "valid-admin").body().contains("\"admin\":true"));
-        HttpResponse<String> summary = getAs("/api/admin/summary", "valid-admin");
-        assertEquals(200, summary.statusCode());
-        assertTrue(summary.body().contains("\"totalUsers\":0"));
+        HttpResponse<String> identity = getAs("/api/auth/user", "valid-user");
+        assertEquals(200, identity.statusCode());
+        assertTrue(identity.body().contains("\"uid\":\"ordinary-user\""));
+        assertFalse(identity.body().contains("admin"));
+        HttpResponse<String> health = get("/api/health");
+        assertEquals(200, health.statusCode());
+        assertFalse(health.body().contains("adminConfigured"));
+        assertEquals(404, getAs("/api/admin/summary", "valid-user").statusCode());
+        assertEquals(404, getWithoutAuth("/api/admin/users").statusCode());
+        assertEquals(404, post("/api/protection/blocklist", "{\"category\":\"ad\",\"rule\":\"example.test\"}").statusCode());
+    }
+
+    @Test
+    void protectedBookmarkApiFailsClosedWhenFirebaseServerCredentialsAreUnavailable() throws Exception {
+        server.setIdentityService(null);
+        HttpResponse<String> response = getAs("/api/bookmarks", "valid-user");
+        assertEquals(503, response.statusCode());
+        assertTrue(response.body().contains("Firebase ID-token verification is unavailable"));
     }
 
     private HttpResponse<String> get(String route) throws Exception {

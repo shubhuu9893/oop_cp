@@ -82,12 +82,6 @@ export const authApi = {
   getUser:  ()               => request('/auth/user'),
 };
 
-export const adminApi = {
-  getSummary: () => request('/admin/summary'),
-  getUsers: (limit = 50, pageToken = '') => request(`/admin/users?limit=${limit}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`),
-  getUser: uid => request(`/admin/users/${encodeURIComponent(uid)}`),
-};
-
 export const healthApi = {
   get: () => request('/health'),
   checkDatabase: () => request('/database/check', { method: 'POST' }),
@@ -155,6 +149,4 @@ export const protectionApi = {
   getStatistics:   ()        => request('/protection/statistics'),
   addAllowlist:    domain    => request('/protection/allowlist', { method: 'POST', body: JSON.stringify({ domain }) }),
   removeAllowlist: domain    => request('/protection/allowlist', { method: 'DELETE', body: JSON.stringify({ domain }) }),
-  addRule:         (category, rule) => request('/protection/blocklist', { method: 'POST', body: JSON.stringify({ category, rule }) }),
-  removeRule:      (category, rule) => request('/protection/blocklist', { method: 'DELETE', body: JSON.stringify({ category, rule }) }),
 };

@@ -34,3 +34,32 @@ test('profile and protection menus render through a viewport-level popup portal'
   assert.match(protection, /Ad Blocking/);
   assert.match(protection, /Tracker Blocking/);
 });
+
+test('profile and protection triggers share one popup state and profile actions close through the owner', async () => {
+  const [toolbar, profile] = await Promise.all([
+    readFile(new URL('../src/components/BrowserToolbar.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/UserMenu.jsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(toolbar, /const \[activePopup, setActivePopup\] = useState\(null\)/);
+  assert.match(toolbar, /setActivePopup\(current => current === kind \? null : kind\)/);
+  assert.match(toolbar, /open=\{activePopup === 'protection'\}/);
+  assert.match(toolbar, /open=\{activePopup === 'profile'\}/);
+  assert.doesNotMatch(profile, /setOpen\(/);
+  assert.match(profile, /close\(\); onDashboard/);
+  assert.match(profile, /close\(\); onSettings/);
+  assert.match(profile, /close\(\); onLogout/);
+});
+
+test('public browser client has no administrator portal or user-directory client', async () => {
+  const [app, toolbar, profile, api] = await Promise.all([
+    readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/BrowserToolbar.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/UserMenu.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/services/api.js', import.meta.url), 'utf8'),
+  ]);
+  assert.doesNotMatch(app, /AdminDashboardPage|panel === ['"]admin['"]|onAdmin/);
+  assert.doesNotMatch(toolbar, /onAdmin/);
+  assert.doesNotMatch(profile, /admin|onAdmin/i);
+  assert.doesNotMatch(api, /adminApi|\/admin\//);
+  assert.match(api, /authApi/);
+});

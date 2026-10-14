@@ -10,4 +10,6 @@ public interface UserRepository {
     void createUser(User user);
     Optional<User> getUserById(String id);
     Optional<User> getUserByEmail(String email);
+    Optional<User> getUserByFirebaseUid(String firebaseUid);
+    User resolveOrCreateByFirebaseUid(String firebaseUid, String email);
 }

@@ -19,7 +19,7 @@ export function useAuth() {
 
   const enrichUser = useCallback(async firebaseUser => {
     if (!firebaseUser) { setUser(null); setOffline(false); setLoading(false); return; }
-    const local = { uid: firebaseUser.uid, email: firebaseUser.email || '', displayName: firebaseUser.displayName || '', loggedIn: true, admin: false };
+    const local = { uid: firebaseUser.uid, email: firebaseUser.email || '', displayName: firebaseUser.displayName || '', loggedIn: true };
     setUser(local);
     try {
       const verified = await authApi.getUser();
@@ -27,8 +27,15 @@ export function useAuth() {
       setUser({ ...local, ...verified });
     } catch (error) {
       setOffline(isOfflineError(error));
-      // Retain actual Firebase client identity for the signed-in UI, but never infer admin.
-      setUser(local);
+      // A Firebase client session is not sufficient for protected API access.
+      // If the backend explicitly rejects verification or is not configured,
+      // fail closed instead of showing a user who cannot load private data.
+      if (error?.status === 401 || error?.status === 403 || error?.status === 503) {
+        setUser(null);
+      } else {
+        // A temporary network/backend outage may recover without signing out.
+        setUser(local);
+      }
     } finally { setLoading(false); }
   }, []);
 
@@ -38,17 +45,27 @@ export function useAuth() {
   }, [enrichUser]);
 
   const login = useCallback(async (email, password) => {
-    try { await firebaseAuth.signIn(email, password); }
+    try {
+      await firebaseAuth.signIn(email, password);
+      await authApi.getUser();
+    }
     catch (error) { throw authFailure('Email sign-in', error); }
   }, []);
 
   const register = useCallback(async (email, password) => {
-    try { await firebaseAuth.register(email, password); }
+    try {
+      await firebaseAuth.register(email, password);
+      await authApi.getUser();
+    }
     catch (error) { throw authFailure('Email registration', error); }
   }, []);
 
   const loginGoogle = useCallback(async () => {
-    try { await firebaseAuth.signInGoogle(); }
+    try {
+      const signedInUser = await firebaseAuth.signInGoogle();
+      // Redirect sign-in returns null and is completed by the auth listener.
+      if (signedInUser) await authApi.getUser();
+    }
     catch (error) { throw authFailure('Google sign-in', error); }
   }, []);
 

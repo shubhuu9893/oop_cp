@@ -18,7 +18,6 @@ import BookmarksPage from './pages/BookmarksPage.jsx';
 import BookmarksBar from './components/BookmarksBar.jsx';
 import DownloadsPage from './pages/DownloadsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
-import AdminDashboardPage from './pages/AdminDashboardPage.jsx';
 import './styles/app.css';
 
 export default function App() {
@@ -162,12 +161,11 @@ export default function App() {
     browser.home();
   }, [browser.home]);
   const togglePanel = useCallback(name => {
-    if (['history', 'bookmarks', 'settings', 'dashboard', 'admin'].includes(name) && !user?.uid) {
+    if (['history', 'bookmarks', 'settings', 'dashboard'].includes(name) && !user?.uid) {
       setAuthIntent(name); setAuthOpen(true); return;
     }
-    if (name === 'admin' && !user?.admin) { setStatusText('Administrator access is not enabled for this account'); return; }
     setPanel(current => current === name ? 'browser' : name);
-  }, [user?.uid, user?.admin]);
+  }, [user?.uid]);
 
   const handleProtectionToggle = useCallback(async kind => {
     try {
@@ -181,8 +179,7 @@ export default function App() {
   }, [toggleAdBlock, toggleTrackerBlock, refreshStats]);
 
   let content;
-  if (panel === 'admin') content = <AdminDashboardPage />;
-  else if (panel === 'dashboard') content = <DashboardPage />;
+  if (panel === 'dashboard') content = <DashboardPage />;
   else if (panel === 'history') content = <HistoryPage onNavigate={handleNavigate} />;
   else if (panel === 'bookmarks') content = <BookmarksPage onNavigate={handleNavigate} onChanged={refreshBookmarks} />;
   else if (panel === 'downloads') content = <DownloadsPage />;
@@ -222,7 +219,6 @@ export default function App() {
         onBookmarks={() => togglePanel('bookmarks')}
         onDownloads={() => togglePanel('downloads')}
         onDashboard={() => togglePanel('dashboard')}
-        onAdmin={() => togglePanel('admin')}
         onSettings={() => togglePanel('settings')}
         onLogin={() => { setAuthIntent(null); setAuthOpen(true); }}
         bookmarkActive={Boolean(bookmarks.find(item => item.url === browser.url))}

@@ -22,8 +22,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Local HTTP Proxy Server with HTTP CONNECT tunneling support.
- * Also configures the JVM ProxySelector so JavaFX WebEngine routes its HTTP/HTTPS
- * requests through this local proxy.
+ * Also configures the JVM ProxySelector so HTTP/HTTPS requests
+ * route through this local caching and filtering proxy.
  */
 public class ProxyServer {
     private static final Logger LOG = LoggerFactory.getLogger(ProxyServer.class);
@@ -101,7 +101,7 @@ public class ProxyServer {
         acceptThread.setDaemon(true);
         acceptThread.start();
 
-        // Install local ProxySelector to route JavaFX WebView network traffic through local proxy
+        // Install local ProxySelector to route HTTP/HTTPS network traffic through local proxy
         installProxySelector();
     }
 
@@ -133,7 +133,7 @@ public class ProxyServer {
                 }
             }
         });
-        LOG.info("Installed Local ProxySelector directing WebView traffic to port {}", port);
+        LOG.info("Installed Local ProxySelector directing outbound HTTP/HTTPS traffic to port {}", port);
     }
 
     public synchronized void stop() {

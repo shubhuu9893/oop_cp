@@ -32,17 +32,19 @@ public class D1BookmarkRepository implements BookmarkRepository {
         String userId = (bookmark.getUserId() != null && !bookmark.getUserId().isBlank())
                 ? bookmark.getUserId()
                 : com.cachebrowse.auth.UserSession.ANONYMOUS_USER_ID;
-
-        // Avoid duplicate in local
-        localFallback.removeIf(b -> (b.getUserId() == null || userId.equals(b.getUserId()))
-                && bookmark.getUrl().equalsIgnoreCase(b.getUrl()));
-        localFallback.add(bookmark);
+        bookmark.setUserId(userId);
+        if (bookmark.getId() == null || bookmark.getId().isBlank()) {
+            bookmark.setId(java.util.UUID.randomUUID().toString());
+        }
 
         if (d1Client != null && d1Client.isConfigured()) {
             try {
-                String sql = "INSERT OR REPLACE INTO bookmarks (id, user_id, url, title, created_at) VALUES (?, ?, ?, ?, ?)";
+                // Update the existing row for this owner/url without REPLACE's
+                // delete-then-insert semantics, which can cause FK surprises.
+                String sql = "INSERT INTO bookmarks (id, user_id, url, title, created_at) VALUES (?, ?, ?, ?, ?) "
+                        + "ON CONFLICT(user_id, url) DO UPDATE SET title = excluded.title";
                 List<Object> params = List.of(
-                        bookmark.getId() != null ? bookmark.getId() : java.util.UUID.randomUUID().toString(),
+                        bookmark.getId(),
                         userId,
                         bookmark.getUrl(),
                         bookmark.getTitle() != null ? bookmark.getTitle() : "",
@@ -54,6 +56,13 @@ public class D1BookmarkRepository implements BookmarkRepository {
                 throw new IllegalStateException("Bookmark is only available in temporary memory because D1 persistence failed", e);
             }
         }
+
+        // The fallback is updated only after a confirmed D1 write (or when
+        // D1 is intentionally unavailable), so callers never see a false
+        // persisted-success state.
+        localFallback.removeIf(b -> userId.equals(b.getUserId())
+                && bookmark.getUrl().equalsIgnoreCase(b.getUrl()));
+        localFallback.add(bookmark);
     }
 
     @Override
@@ -61,6 +70,15 @@ public class D1BookmarkRepository implements BookmarkRepository {
         if (id == null || url == null || url.isBlank()) return;
         String effectiveUserId = (userId != null && !userId.isBlank())
                 ? userId : com.cachebrowse.auth.UserSession.ANONYMOUS_USER_ID;
+        if (d1Client != null && d1Client.isConfigured()) {
+            try {
+                d1Client.executeChecked("UPDATE bookmarks SET url = ?, title = ? WHERE id = ? AND user_id = ?",
+                        List.of(url, title == null ? "" : title, id, effectiveUserId));
+            } catch (Exception e) {
+                LOG.warn("Failed to update bookmark in D1 for user {}: {}", effectiveUserId, e.getMessage());
+                throw new IllegalStateException("Bookmark could not be persisted to D1", e);
+            }
+        }
         boolean found = false;
         for (Bookmark bookmark : localFallback) {
             if (id.equals(bookmark.getId()) && effectiveUserId.equals(bookmark.getUserId())) {
@@ -70,25 +88,15 @@ public class D1BookmarkRepository implements BookmarkRepository {
                 break;
             }
         }
-        if (d1Client != null && d1Client.isConfigured()) {
-            try {
-                d1Client.execute("UPDATE bookmarks SET url = ?, title = ? WHERE id = ? AND user_id = ?",
-                        List.of(url, title == null ? "" : title, id, effectiveUserId));
-                return;
-            } catch (Exception e) {
-                LOG.warn("Failed to update bookmark in D1 for user {}: {}", effectiveUserId, e.getMessage());
-                throw new IllegalStateException("Bookmark could not be persisted to D1", e);
-            }
+        if (!found && (d1Client == null || !d1Client.isConfigured())) {
+            throw new IllegalArgumentException("Bookmark not found");
         }
-        if (!found) throw new IllegalArgumentException("Bookmark not found");
     }
 
     @Override
     public void removeBookmark(String userId, String id) {
         if (id == null) return;
         String effectiveUserId = (userId != null && !userId.isBlank()) ? userId : com.cachebrowse.auth.UserSession.ANONYMOUS_USER_ID;
-        localFallback.removeIf(b -> id.equals(b.getId()) && effectiveUserId.equals(b.getUserId()));
-
         if (d1Client != null && d1Client.isConfigured()) {
             try {
                 String sql = "DELETE FROM bookmarks WHERE user_id = ? AND id = ?";
@@ -98,22 +106,23 @@ public class D1BookmarkRepository implements BookmarkRepository {
                 throw new IllegalStateException("Bookmark deletion was not persisted", e);
             }
         }
+        localFallback.removeIf(b -> id.equals(b.getId()) && effectiveUserId.equals(b.getUserId()));
     }
 
     @Override
     public void removeBookmarkByUrl(String userId, String url) {
         if (url == null) return;
         String effectiveUserId = (userId != null && !userId.isBlank()) ? userId : com.cachebrowse.auth.UserSession.ANONYMOUS_USER_ID;
-        localFallback.removeIf(b -> (b.getUserId() == null || b.getUserId().equals(effectiveUserId)) && url.equalsIgnoreCase(b.getUrl()));
-
         if (d1Client != null && d1Client.isConfigured()) {
             try {
                 String sql = "DELETE FROM bookmarks WHERE user_id = ? AND url = ?";
                 d1Client.executeChecked(sql, List.of(effectiveUserId, url));
             } catch (Exception e) {
                 LOG.warn("Failed to delete bookmark by url from D1: {}", e.getMessage());
+                return;
             }
         }
+        localFallback.removeIf(b -> effectiveUserId.equals(b.getUserId()) && url.equalsIgnoreCase(b.getUrl()));
     }
 
     @Override
@@ -132,7 +141,7 @@ public class D1BookmarkRepository implements BookmarkRepository {
         }
 
         return localFallback.stream()
-                .anyMatch(b -> (b.getUserId() == null || b.getUserId().equals(effectiveUserId)) && url.equalsIgnoreCase(b.getUrl()));
+                .anyMatch(b -> effectiveUserId.equals(b.getUserId()) && url.equalsIgnoreCase(b.getUrl()));
     }
 
     @Override
@@ -167,7 +176,7 @@ public class D1BookmarkRepository implements BookmarkRepository {
 
         List<Bookmark> list = new ArrayList<>();
         for (Bookmark b : localFallback) {
-            if (b.getUserId() == null || b.getUserId().equals(effectiveUserId)) {
+            if (effectiveUserId.equals(b.getUserId())) {
                 list.add(b);
             }
         }
@@ -177,15 +186,15 @@ public class D1BookmarkRepository implements BookmarkRepository {
     @Override
     public void clearBookmarks(String userId) {
         String effectiveUserId = (userId != null && !userId.isBlank()) ? userId : com.cachebrowse.auth.UserSession.ANONYMOUS_USER_ID;
-        localFallback.removeIf(b -> b.getUserId() == null || b.getUserId().equals(effectiveUserId));
-
         if (d1Client != null && d1Client.isConfigured()) {
             try {
                 String sql = "DELETE FROM bookmarks WHERE user_id = ?";
                 d1Client.executeChecked(sql, List.of(effectiveUserId));
             } catch (Exception e) {
                 LOG.warn("Failed to clear bookmarks in D1: {}", e.getMessage());
+                return;
             }
         }
+        localFallback.removeIf(b -> effectiveUserId.equals(b.getUserId()));
     }
 }

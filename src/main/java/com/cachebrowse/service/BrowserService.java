@@ -28,6 +28,7 @@ public class BrowserService {
     private final StatisticsService statisticsService;
     private final AuthenticationService authenticationService;
     private final UserSession userSession;
+    private final ProtectionLogService protectionLogService;
 
     public BrowserService(NetworkService networkService,
                           CacheService cacheService,
@@ -38,6 +39,20 @@ public class BrowserService {
                           SettingsService settingsService,
                           StatisticsService statisticsService,
                           AuthenticationService authenticationService) {
+        this(networkService, cacheService, adBlocker, trackerBlocker, historyService,
+             bookmarkService, settingsService, statisticsService, authenticationService, null);
+    }
+
+    public BrowserService(NetworkService networkService,
+                          CacheService cacheService,
+                          AdBlocker adBlocker,
+                          TrackerBlocker trackerBlocker,
+                          HistoryService historyService,
+                          BookmarkService bookmarkService,
+                          SettingsService settingsService,
+                          StatisticsService statisticsService,
+                          AuthenticationService authenticationService,
+                          ProtectionLogService protectionLogService) {
         this.networkService = networkService != null ? networkService : new NetworkService();
         this.cacheService = cacheService;
         this.adBlocker = adBlocker != null ? adBlocker : new AdBlocker();
@@ -47,6 +62,7 @@ public class BrowserService {
         this.settingsService = settingsService;
         this.statisticsService = statisticsService;
         this.authenticationService = authenticationService;
+        this.protectionLogService = protectionLogService;
         this.userSession = authenticationService != null ? authenticationService.getUserSession() : UserSession.getInstance();
     }
 
@@ -64,7 +80,7 @@ public class BrowserService {
      * The HTML is intentionally minimal – it only contains a large central
      * search bar that forwards user input to the Java side via a custom
      * {@code cachebrowse://navigate?url=...} protocol.  This keeps all
-     * navigation logic in {@link com.cachebrowse.ui.BrowserController},
+     * navigation logic in the backend pipeline,
      * preserving ad‑block, tracker‑block and history integration.
      */
     private String generateHomepageContent() {
@@ -122,7 +138,16 @@ public class BrowserService {
 
         // 2. Ad Blocker Check
         if (settings.isAdBlockingEnabled() && adBlocker.isAdBlocked(resolvedUrl)) {
-            if (stats != null) {
+            String rule = adBlocker.findMatchingRule(resolvedUrl);
+            if (protectionLogService != null) {
+                com.cachebrowse.model.ProtectionEvent ev = new com.cachebrowse.model.ProtectionEvent();
+                ev.setEventType(com.cachebrowse.model.ProtectionEventType.AD);
+                ev.setAction(com.cachebrowse.model.ProtectionAction.BLOCKED);
+                ev.setResourceUrl(resolvedUrl);
+                ev.setRule(rule);
+                ev.setReason("Ad Blocker matched rule");
+                protectionLogService.recordEvent(ev);
+            } else if (stats != null) {
                 stats.incAdsBlocked();
             }
             return CompletableFuture.completedFuture(
@@ -132,7 +157,16 @@ public class BrowserService {
 
         // 3. Tracker Blocker Check
         if (settings.isTrackerBlockingEnabled() && trackerBlocker.isTrackerBlocked(resolvedUrl)) {
-            if (stats != null) {
+            String rule = trackerBlocker.findMatchingRule(resolvedUrl);
+            if (protectionLogService != null) {
+                com.cachebrowse.model.ProtectionEvent ev = new com.cachebrowse.model.ProtectionEvent();
+                ev.setEventType(com.cachebrowse.model.ProtectionEventType.TRACKER);
+                ev.setAction(com.cachebrowse.model.ProtectionAction.BLOCKED);
+                ev.setResourceUrl(resolvedUrl);
+                ev.setRule(rule);
+                ev.setReason("Tracker Blocker matched rule");
+                protectionLogService.recordEvent(ev);
+            } else if (stats != null) {
                 stats.incTrackersBlocked();
             }
             return CompletableFuture.completedFuture(

@@ -320,6 +320,17 @@ function createTab(url = '') {
     tab.error = `Page process stopped (${details.reason}). Reload to try again.`;
     emitTab(tab, 'error');
   });
+  contents.on('console-message', details => {
+    const host = (() => { try { return new URL(contents.getURL()).hostname; } catch { return ''; } })();
+    if (details.level === 'error' || /youtube|media|codec|mse|gpu/i.test(details.message)) {
+      console[details.level === 'error' ? 'error' : 'info'](
+        `[Page ${host || tab.id}] ${details.message}${details.sourceId ? ` (${details.sourceId}:${details.lineNumber})` : ''}`,
+      );
+    }
+  });
+  contents.on('media-started-playing', () => console.info(`[Media ${tab.id}] started ${contents.getURL()}`));
+  contents.on('media-paused', () => console.info(`[Media ${tab.id}] paused ${contents.getURL()}`));
+  contents.on('media-stopped-playing', () => console.info(`[Media ${tab.id}] stopped ${contents.getURL()}`));
 
   activeTabId = id;
   updateBrowserViewVisibility();
@@ -360,7 +371,19 @@ function registerIpc() {
   handle('browser:get-tabs', () => ({ tabs: [...tabs.values()].map(publicTab), activeTabId }));
   handle('backend:get-status', () => ({ ...backendStatus }));
   handle('browser:get-protection-runtime-status', () => protectionController?.getRuntimeStatus() || { available: false });
-  handle('browser:get-layout-metrics', () => ({ window: windowRef?.getContentSize() || null, page: { ...pageBounds }, popup: activePopup ? { ...activePopup.bounds } : null, overlay: overlayAttached && activePopup ? { ...activePopup.bounds } : null, overlayAttached, overlayVisible: Boolean(overlayView?.getVisible()), activePageVisible: Boolean(activeTab()?.view.getVisible()), activePageBounds: activeTab()?.view.getBounds() || null }));
+  handle('browser:get-layout-metrics', () => ({
+    window: windowRef?.getContentSize() || null,
+    page: { ...pageBounds },
+    popup: activePopup ? { ...activePopup.bounds } : null,
+    popupKind: activePopup?.kind || null,
+    // Report actual native bounds separately from the requested popup/page
+    // rectangles so diagnostics can catch a stale WebContentsView covering UI.
+    overlayBounds: overlayView?.getBounds() || null,
+    overlayAttached,
+    overlayVisible: Boolean(overlayView?.getVisible()),
+    activePageVisible: Boolean(activeTab()?.view.getVisible()),
+    activePageBounds: activeTab()?.view.getBounds() || null,
+  }));
   handle('browser:show-popup-overlay', (message) => updatePopupOverlay(message));
   handle('browser:close-popup-overlay', id => closePopupOverlay(typeof id === 'string' ? id : null));
   handle('browser:new-tab', url => {
@@ -474,7 +497,7 @@ function registerIpc() {
   ipcMain.on('popup:action', (event, message) => {
     if (!overlayView || event.sender !== overlayView.webContents || !activePopup
         || !message || message.id !== activePopup.id
-        || !['dashboard', 'admin', 'settings', 'signout', 'toggle-ad', 'toggle-tracker', 'query', 'folder', 'open', 'open-new-tab', 'edit', 'remove', 'create-folder', 'manage', 'edit-change', 'save', 'cancel-edit'].includes(message.action)) return;
+        || !['dashboard', 'settings', 'signout', 'toggle-ad', 'toggle-tracker', 'query', 'folder', 'open', 'open-new-tab', 'edit', 'remove', 'create-folder', 'manage', 'edit-change', 'save', 'cancel-edit'].includes(message.action)) return;
     let value = message.value;
     try {
       if (Buffer.byteLength(JSON.stringify(value ?? null), 'utf8') > 16_384) return;
@@ -604,6 +627,10 @@ async function start() {
     browserSession = session.fromPartition('persist:cachebrowse');
     browserSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     browserSession.setPermissionCheckHandler(() => false);
+    app.on('gpu-info-update', () => {
+      app.getGPUInfo('basic').then(info => console.info(`[GPU] status=${info?.gpuDevice?.[0]?.deviceString || 'unavailable'}`))
+        .catch(error => console.warn(`[GPU] diagnostics unavailable: ${error.message}`));
+    });
     await loadDownloads();
     protectionController = new ChromiumProtection({
       session: browserSession,

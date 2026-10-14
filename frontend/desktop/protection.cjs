@@ -24,6 +24,9 @@ const TRACKER_LISTS = adsAndTrackingLists.filter(url => !adsLists.includes(url))
 const filterFetchCache = new Map();
 const INJECTION_HANDLER = '@ghostery/adblocker/inject-cosmetic-filters';
 const MUTATION_HANDLER = '@ghostery/adblocker/is-mutation-observer-enabled';
+// Diagnostic-only escape hatch. It is deliberately opt-in and process-local;
+// normal browsing always keeps the narrow playback exceptions below.
+const YOUTUBE_BYPASS = process.env.CACHEBROWSE_YOUTUBE_PROTECTION_BYPASS === '1';
 
 const FALLBACK_AD_FILTERS = [
   '||doubleclick.net^',
@@ -190,6 +193,10 @@ function decideRequest({ details, protection, adsEngine, trackersEngine, fallbac
   if (isProtectedPlaybackRequest(details)) {
     return { action: 'allow', reason: 'youtube-playback-safety' };
   }
+  if (YOUTUBE_BYPASS && (isYouTubeHost(target.hostname.toLowerCase()) || isYouTubeHost(getHost(sourceUrl))
+      || isGoogleVideoHost(target.hostname.toLowerCase()))) {
+    return { action: 'allow', reason: 'youtube-diagnostic-bypass' };
+  }
 
   const request = makeFilterRequest(details);
   if (protection.adBlock) {
@@ -344,6 +351,7 @@ class ChromiumProtection {
   bindManagedHandlers() {
     // Electron supports only one listener per webRequest event. This is the
     // single policy pipeline for every WebContentsView sharing this session.
+    if (this.requestHookInstalled) return;
     this.session.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => {
       let called = false;
       const finish = response => {

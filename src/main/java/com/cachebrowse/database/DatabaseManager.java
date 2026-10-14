@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +27,7 @@ public class DatabaseManager {
     private final SettingsRepository settingsRepository;
     private final StatisticsRepository statisticsRepository;
     private final UserRepository userRepository;
+    private final com.cachebrowse.database.repository.D1ProtectionEventRepository protectionEventRepository;
     private volatile boolean initialized;
     private volatile String diagnostic = "not_checked";
 
@@ -46,6 +48,7 @@ public class DatabaseManager {
         this.settingsRepository = new D1SettingsRepository(this.d1Client);
         this.statisticsRepository = new D1StatisticsRepository(this.d1Client);
         this.userRepository = new D1UserRepository(this.d1Client);
+        this.protectionEventRepository = new com.cachebrowse.database.repository.D1ProtectionEventRepository(this.d1Client);
 
         if (this.config.isConfigured()) {
             initSchema();
@@ -83,6 +86,13 @@ public class DatabaseManager {
                 }
             }
             if (!connected) throw new IllegalStateException("D1 connectivity check failed (" + d1Client.getLastFailure() + ")");
+
+            // Older installations may already have a users table created
+            // before firebase_uid was introduced. Run additive migrations
+            // before loading the idempotent schema so its index statements do
+            // not fail with "no such column" and abort the whole startup.
+            migrateUsersColumns();
+
             List<String> statements = loadSchemaStatements();
             if (statements.isEmpty()) {
                 throw new IllegalStateException("D1 schema file is missing or empty");
@@ -90,6 +100,7 @@ public class DatabaseManager {
             if (!d1Client.executeBatch(statements)) {
                 throw new IllegalStateException("schema_initialization_failed (" + d1Client.getLastFailure() + ")");
             }
+            runMigrationsAndBootstrap();
             initialized = true;
             diagnostic = "none";
             LOG.info("D1 Database schema initialized successfully.");
@@ -99,6 +110,53 @@ public class DatabaseManager {
             if (diagnostic == null || diagnostic.isBlank() || "none".equals(diagnostic)) diagnostic = "schema_initialization_failed";
             d1Client.markUnavailable();
             LOG.error("Failed to initialize Cloudflare D1 ({}); using non-persistent fallback mode", diagnostic);
+        }
+    }
+
+    private void runMigrationsAndBootstrap() {
+        // Older databases may contain duplicate non-null Firebase UIDs because
+        // firebase_uid was added before its unique index. Keep every user row,
+        // but detach later duplicates so the safe unique constraint can be
+        // created without deleting existing data.
+        d1Client.executeChecked("UPDATE users SET firebase_uid = NULL WHERE firebase_uid IS NOT NULL AND rowid NOT IN (SELECT MIN(rowid) FROM users WHERE firebase_uid IS NOT NULL GROUP BY firebase_uid)", List.of());
+        d1Client.executeChecked("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid)", List.of());
+
+        String defaultUid = com.cachebrowse.auth.UserSession.ANONYMOUS_USER_ID;
+        String defaultEmail = com.cachebrowse.auth.UserSession.ANONYMOUS_USER_EMAIL;
+        String bootstrapUser = "INSERT INTO users (id, firebase_uid, email, created_at) " +
+                "VALUES (?, ?, ?, datetime('now')) " +
+                "ON CONFLICT(id) DO UPDATE SET email = excluded.email";
+        d1Client.executeChecked(bootstrapUser, List.of(defaultUid, defaultUid, defaultEmail));
+        d1Client.executeChecked("INSERT INTO browser_settings (user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING", List.of(defaultUid));
+        d1Client.executeChecked("INSERT INTO statistics (user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING", List.of(defaultUid));
+        LOG.info("D1 default user bootstrap completed successfully.");
+    }
+
+    /** Additive migrations that must precede schema indexes and constraints. */
+    private void migrateUsersColumns() {
+        List<Map<String, Object>> tables = d1Client.query(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1",
+                List.of("users"));
+        ensureMigrationQuerySucceeded("users table lookup");
+        if (tables.isEmpty()) return; // New database: CREATE TABLE follows.
+
+        List<Map<String, Object>> columns = d1Client.query("PRAGMA table_info(users)", List.of());
+        ensureMigrationQuerySucceeded("users column lookup");
+        boolean hasFirebaseUid = columns.stream().anyMatch(row ->
+                "firebase_uid".equalsIgnoreCase(String.valueOf(row.get("name"))));
+        if (hasFirebaseUid) {
+            LOG.debug("D1 migration skipped: users.firebase_uid already exists");
+            return;
+        }
+
+        d1Client.executeChecked("ALTER TABLE users ADD COLUMN firebase_uid TEXT", List.of());
+        LOG.info("D1 migration applied: users.firebase_uid");
+    }
+
+    private void ensureMigrationQuerySucceeded(String operation) {
+        String failure = d1Client.getLastFailure();
+        if (failure != null && !failure.isBlank() && !"none".equals(failure) && !"not_checked".equals(failure)) {
+            throw new IllegalStateException("D1 migration " + operation + " failed (" + failure + ")");
         }
     }
 
@@ -187,5 +245,9 @@ public class DatabaseManager {
 
     public UserRepository getUserRepository() {
         return userRepository;
+    }
+
+    public com.cachebrowse.database.repository.D1ProtectionEventRepository getProtectionEventRepository() {
+        return protectionEventRepository;
     }
 }

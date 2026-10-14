@@ -12,9 +12,12 @@
 --    reference this table via FOREIGN KEY (user_id) REFERENCES users(id).
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
+    firebase_uid TEXT UNIQUE,
+    email TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
 
 -- 2. Browsing History Table
 CREATE TABLE IF NOT EXISTS history (
@@ -83,3 +86,26 @@ CREATE TABLE IF NOT EXISTS statistics (
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- 7. Protection Events Table (Optional Persistent Logs)
+CREATE TABLE IF NOT EXISTS protection_events (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    session_id TEXT NOT NULL,
+    tab_id TEXT,
+    page_url TEXT,
+    page_hostname TEXT,
+    resource_url TEXT NOT NULL,
+    resource_hostname TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    action TEXT NOT NULL,
+    rule TEXT,
+    reason TEXT,
+    resource_type TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_protection_events_session ON protection_events(session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_protection_events_user ON protection_events(user_id, created_at DESC);
+

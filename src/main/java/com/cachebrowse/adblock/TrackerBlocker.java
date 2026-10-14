@@ -80,6 +80,13 @@ public class TrackerBlocker {
         return blockList.matches(url);
     }
 
+    public String findMatchingRule(String url) {
+        if (!enabled || url == null || url.isBlank()) {
+            return null;
+        }
+        return blockList.findMatchingRule(url);
+    }
+
     public void addRule(String rule) {
         blockList.addRule(rule);
     }

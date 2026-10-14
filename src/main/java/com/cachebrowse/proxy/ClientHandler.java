@@ -160,7 +160,7 @@ public class ClientHandler implements Runnable {
      *
      * Video/audio streaming responses are excluded because:
      * - Segments are 1–10 MB each — caching them exhausts the LRU and causes GC storms.
-     * - GC storms during playback stall the JavaFX rendering thread → WebView flickers.
+     * - Excessive memory pressure during playback stalls worker threads.
      * - Segments have no reuse value (played once, then discarded by the player).
      * - Range requests (206 Partial Content) cannot be correctly served from cache.
      */

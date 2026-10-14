@@ -27,6 +27,12 @@ export default defineConfig(({ mode }) => {
     host: 'localhost',
     port: vitePort,
     strictPort: true,
+    // Firebase popup auth needs the opener relationship to remain available
+    // while the provider window is closing. This is not an auth bypass and
+    // does not expose backend credentials to the browser.
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
     proxy: {
       '/api': {
         target: apiTarget,

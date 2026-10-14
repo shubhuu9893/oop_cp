@@ -45,6 +45,15 @@ async function eventually(check, label) {
   throw new Error(`Timed out: ${label}`);
 }
 
+async function pointAt(ui, selector) {
+  return ui.evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)return null;const r=e.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()`);
+}
+
+async function clickPoint(target, point) {
+  await target.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
+  await target.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
+}
+
 async function main() {
   const targets = await eventually(async () => {
     try {
@@ -60,13 +69,18 @@ async function main() {
   let temporaryTabId;
   let toolbarPointerDelivered = false;
   let tabPointerDelivered = false;
+  let shieldClickToggle = false;
+  let avatarClickToggle = 'skipped: no authenticated profile';
+  let escapeDismissed = false;
+  let outsideDismissed = false;
   const initialTabs = await ui.evaluate('window.cacheBrowse.getTabs()');
   const originalTabId = initialTabs.activeTabId;
   try {
+    await eventually(() => ui.evaluate("Boolean(document.querySelector('.browser-toolbar') && document.querySelector('.protection-trigger'))"), 'React toolbar initialized');
     const before = await ui.evaluate('window.cacheBrowse.getLayoutMetrics()');
     await ui.evaluate(`window.cacheBrowse.showPopupOverlay({ id: 'overlay-regression', kind: 'protection', payload: { adBlock: true, trackerBlock: true, status: 'Test state' }, bounds: { x: 24, y: 80, width: 280, height: 220 } })`);
     const visible = await eventually(async () => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => state.overlayVisible && state.overlayAttached && state.popup ? state : null)'), 'popup overlay visible');
-    const overlayBounds = visible.overlay;
+    const overlayBounds = visible.overlayBounds;
     if (!overlayBounds || JSON.stringify(overlayBounds) !== JSON.stringify(visible.popup)
         || (overlayBounds.x === 0 && overlayBounds.y === 0 && overlayBounds.width === visible.window[0] && overlayBounds.height === visible.window[1])) {
       throw new Error(`Native popup view is not constrained to the popup: ${JSON.stringify(visible)}`);
@@ -79,6 +93,54 @@ async function main() {
     if (JSON.stringify(before.page) !== JSON.stringify(during.page)) throw new Error('Popup changed Chromium page bounds');
     await ui.evaluate("window.cacheBrowse.closePopupOverlay('overlay-regression')");
     const closed = await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => !state.overlayVisible && !state.overlayAttached && !state.popup)'), 'native overlay detached');
+
+    const shieldPoint = await pointAt(ui, '.protection-trigger');
+    if (!shieldPoint) throw new Error('Shield control was not present after toolbar initialization');
+    for (let cycle = 0; cycle < 5; cycle++) {
+      await clickPoint(ui, shieldPoint);
+      await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => state.popupKind === "protection" && document.querySelector(".protection-trigger").getAttribute("aria-expanded") === "true")'), `shield opens, cycle ${cycle + 1}`);
+      await clickPoint(ui, shieldPoint);
+      await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => !state.popup && document.querySelector(".protection-trigger").getAttribute("aria-expanded") === "false")'), `shield closes, cycle ${cycle + 1}`);
+    }
+    shieldClickToggle = true;
+    await clickPoint(ui, shieldPoint);
+    await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => state.popupKind === "protection")'), 'reopen protection popup for outside dismissal');
+    await ui.evaluate("window.__cacheBrowsePointerEvents=[]; addEventListener('pointerdown', event => window.__cacheBrowsePointerEvents.push({ x: event.clientX, y: event.clientY, target: event.target?.className || event.target?.tagName }), true)");
+    const addressPoint = await pointAt(ui, '.address-bar__input');
+    await clickPoint(ui, addressPoint);
+    const pointerEvents = await eventually(() => ui.evaluate('window.__cacheBrowsePointerEvents?.length ? window.__cacheBrowsePointerEvents : null'), 'address bar pointer event with protection overlay open');
+    if (!pointerEvents.some(event => event.target.includes('address'))) throw new Error(`Address bar did not receive pointer input: ${JSON.stringify(pointerEvents)}`);
+    toolbarPointerDelivered = true;
+    await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => !state.popup)'), 'address click closes protection popup');
+    outsideDismissed = true;
+    await clickPoint(ui, shieldPoint);
+    await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => state.popupKind === "protection")'), 'reopen protection popup for Escape test');
+    await overlay.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Escape', windowsVirtualKeyCode: 27 });
+    await overlay.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', windowsVirtualKeyCode: 27 });
+    await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => !state.popup)'), 'Escape closes protection popup');
+    escapeDismissed = true;
+
+    const avatarPoint = await pointAt(ui, '.user-avatar-btn');
+    if (avatarPoint) {
+      for (let cycle = 0; cycle < 5; cycle++) {
+        await clickPoint(ui, avatarPoint);
+        await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => state.popupKind === "profile" && document.querySelector(".user-avatar-btn").getAttribute("aria-expanded") === "true")'), `avatar opens, cycle ${cycle + 1}`);
+        await clickPoint(ui, avatarPoint);
+        await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => !state.popup && document.querySelector(".user-avatar-btn").getAttribute("aria-expanded") === "false")'), `avatar closes, cycle ${cycle + 1}`);
+      }
+      avatarClickToggle = 'five repeated open/close cycles passed';
+      await clickPoint(ui, shieldPoint);
+      await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => state.popupKind === "protection")'), 'protection open before switching popup');
+      await clickPoint(ui, avatarPoint);
+      await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => state.popupKind === "profile")'), 'profile replaces protection popup');
+      await clickPoint(ui, addressPoint);
+      await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => !state.popup && document.querySelector(".user-avatar-btn").getAttribute("aria-expanded") === "false")'), 'outside address click closes profile menu');
+      await clickPoint(ui, avatarPoint);
+      await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => state.popupKind === "profile")'), 'reopen profile menu for Escape check');
+      await overlay.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Escape', windowsVirtualKeyCode: 27 });
+      await overlay.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', windowsVirtualKeyCode: 27 });
+      await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => !state.popup)'), 'Escape closes profile menu');
+    }
 
     temporaryTabId = await ui.evaluate("window.cacheBrowse.newTab('https://example.com/')");
     await eventually(() => ui.evaluate(`window.cacheBrowse.getTabs().then(state => state.tabs.find(tab => tab.id === ${JSON.stringify(temporaryTabId)})?.url === 'https://example.com/')`), 'temporary real page for post-auth interaction checks');
@@ -95,6 +157,15 @@ async function main() {
     if (pageAnchor.target !== 'A') throw new Error(`Test page link is not hit-testable at its center: ${JSON.stringify(pageAnchor)}`);
     const webpageContent = await pageContents.evaluate("({ title: document.title, text: document.body?.innerText?.trim().slice(0, 120) || '' })");
     if (!webpageContent.text) throw new Error(`Actual test website has no rendered text: ${JSON.stringify(webpageContent)}`);
+
+    const tabPoint = await pointAt(ui, '.tabbar__tab:not(.active)');
+    if (tabPoint) {
+      await clickPoint(ui, tabPoint);
+      await eventually(() => ui.evaluate(`window.cacheBrowse.getTabs().then(state => state.activeTabId === ${JSON.stringify(originalTabId)})`), 'switch to original tab by tab-strip pointer');
+      tabPointerDelivered = true;
+      await ui.evaluate(`window.cacheBrowse.activateTab(${JSON.stringify(temporaryTabId)})`);
+      await eventually(() => ui.evaluate(`window.cacheBrowse.getTabs().then(state => state.activeTabId === ${JSON.stringify(temporaryTabId)})`), 'restore test tab');
+    }
 
     const hasProfile = await ui.evaluate("Boolean(document.querySelector('.user-avatar-btn'))");
     let profileMenu = 'not exercised: no authenticated profile is present';
@@ -113,26 +184,8 @@ async function main() {
       }
       const profileBounds = await ui.evaluate('window.cacheBrowse.getLayoutMetrics()');
       if (JSON.stringify(profileBoundsBefore.page) !== JSON.stringify(profileBounds.page)) throw new Error(`Profile menu changed page bounds: ${JSON.stringify({ before: profileBoundsBefore.page, after: profileBounds.page })}`);
-      await ui.evaluate("window.__cacheBrowsePointerEvents=[]; addEventListener('pointerdown', event => window.__cacheBrowsePointerEvents.push({ x: event.clientX, y: event.clientY, target: event.target?.className || event.target?.tagName }), true)");
-      const toolbarPoint = await ui.evaluate("(()=>{const r=document.querySelector('.address-bar__input').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()");
-      await ui.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: toolbarPoint.x, y: toolbarPoint.y, button: 'left', clickCount: 1 });
-      await ui.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: toolbarPoint.x, y: toolbarPoint.y, button: 'left', clickCount: 1 });
-      const pointerEvents = await eventually(() => ui.evaluate('window.__cacheBrowsePointerEvents?.length ? window.__cacheBrowsePointerEvents : null'), 'toolbar pointer event through native popup composition');
-      if (!pointerEvents.length || !pointerEvents.some(event => event.y < visible.page.y || event.target.includes('address'))) throw new Error(`Toolbar pointer did not reach React: ${JSON.stringify(pointerEvents)}`);
-      toolbarPointerDelivered = true;
-      await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => !state.overlayAttached && !state.popup)'), 'profile outside-click closure');
-      const tabPoint = await ui.evaluate("(()=>{const tab=document.querySelector('.tabbar__tab:not(.active)');if(!tab)return null;const r=tab.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()");
-      if (!tabPoint) throw new Error('A second tab was not available for the tab pointer test');
-      await ui.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: tabPoint.x, y: tabPoint.y, button: 'left', clickCount: 1 });
-      await ui.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: tabPoint.x, y: tabPoint.y, button: 'left', clickCount: 1 });
-      await eventually(() => ui.evaluate(`window.cacheBrowse.getTabs().then(state => state.activeTabId === ${JSON.stringify(originalTabId)})`), 'switch to original tab via tab strip pointer');
-      tabPointerDelivered = true;
-      await ui.evaluate(`window.cacheBrowse.activateTab(${JSON.stringify(temporaryTabId)})`);
-      await eventually(() => ui.evaluate(`window.cacheBrowse.getTabs().then(state => state.activeTabId === ${JSON.stringify(temporaryTabId)})`), 'restore temporary test tab');
       profileMenu = 'actual signed-in profile menu rendered; Dashboard, Settings, Sign Out present';
 
-      await ui.evaluate("document.querySelector('.user-avatar-btn').click()");
-      await eventually(() => ui.evaluate('window.cacheBrowse.getLayoutMetrics().then(state => Boolean(state.popup))'), 'profile menu for dashboard navigation');
       const dashboardPoint = await overlay.evaluate("(()=>{const item=document.querySelector('.user-dropdown__item');const r=item.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()");
       await overlay.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: dashboardPoint.x, y: dashboardPoint.y, button: 'left', clickCount: 1 });
       await overlay.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: dashboardPoint.x, y: dashboardPoint.y, button: 'left', clickCount: 1 });
@@ -155,7 +208,7 @@ async function main() {
       await eventually(() => ui.evaluate("!document.querySelector('.auth-overlay') && window.cacheBrowse.getLayoutMetrics().then(state => state.activePageVisible && !state.overlayAttached)"), 'auth modal removed and page restored');
       authModal = 'opened/closed; native overlay detached and Chromium surface restored';
     }
-    console.log(JSON.stringify({ popupVisible: true, nativePopupViewBounds: visible.overlay, nativePageBoundsMatchReactViewport: true, webpageContentLoadedInChromium: webpageContent, webpageLinkHitTestTarget: pageAnchor.target, toolbarPointerDelivered, tabPointerDelivered, pageBoundsUnchanged: true, overlayDetachedOnClose: Boolean(closed), profileMenu, authenticatedNavigation: hasProfile ? 'Dashboard and Settings actions worked; browser surface restored' : 'not tested without an authenticated profile', authModal, firebaseCredentialLogin: 'not tested; no credentials supplied' }, null, 2));
+    console.log(JSON.stringify({ popupVisible: true, requestedPopupBounds: visible.popup, actualNativePopupViewBounds: visible.overlayBounds, nativePopupBoundsMatchRequest: JSON.stringify(visible.popup) === JSON.stringify(visible.overlayBounds), shieldClickToggle, avatarClickToggle, outsideDismissed, escapeDismissed, nativePageBoundsMatchReactViewport: true, webpageContentLoadedInChromium: webpageContent, webpageLinkHitTestTarget: pageAnchor.target, toolbarPointerDelivered, tabPointerDelivered, pageBoundsUnchanged: true, overlayDetachedOnClose: Boolean(closed), profileMenu, authenticatedNavigation: hasProfile ? 'Dashboard and Settings actions worked; browser surface restored' : 'not tested without an authenticated profile', authModal, firebaseCredentialLogin: 'not tested; no credentials supplied' }, null, 2));
   } finally {
     if (temporaryTabId) {
       await ui.evaluate(`window.cacheBrowse.closeTab(${JSON.stringify(temporaryTabId)})`).catch(() => {});

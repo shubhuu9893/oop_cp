@@ -3,10 +3,11 @@ package com.cachebrowse.model;
 import java.time.Instant;
 
 /**
- * Model representing a user profile.
+ * Model representing an application user profile, mapped to the underlying database record.
  */
 public class User {
     private String id;
+    private String firebaseUid;
     private String email;
     private Instant createdAt;
 
@@ -15,13 +16,18 @@ public class User {
     }
 
     public User(String id, String email, Instant createdAt) {
-        this.id = id;
-        this.email = email;
-        this.createdAt = createdAt != null ? createdAt : Instant.now();
+        this(id, id, email, createdAt);
     }
 
     public User(String id, String email) {
-        this(id, email, Instant.now());
+        this(id, id, email, Instant.now());
+    }
+
+    public User(String id, String firebaseUid, String email, Instant createdAt) {
+        this.id = id;
+        this.firebaseUid = firebaseUid != null ? firebaseUid : id;
+        this.email = email;
+        this.createdAt = createdAt != null ? createdAt : Instant.now();
     }
 
     public String getId() {
@@ -30,6 +36,14 @@ public class User {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getFirebaseUid() {
+        return firebaseUid;
+    }
+
+    public void setFirebaseUid(String firebaseUid) {
+        this.firebaseUid = firebaseUid;
     }
 
     public String getEmail() {

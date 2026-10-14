@@ -58,7 +58,6 @@ function ProfilePopup({ data = {}, act }) {
     </div>
     <div className="user-dropdown__divider" />
     <MenuAction icon={IconDashboard} label="Dashboard" onClick={() => act('dashboard')} />
-    {data.admin && <MenuAction icon={IconDashboard} label="Admin Dashboard" onClick={() => act('admin')} />}
     <MenuAction icon={IconSettings} label="Settings" onClick={() => act('settings')} />
     <div className="user-dropdown__divider" />
     <MenuAction icon={IconLogout} label="Sign Out" danger onClick={() => act('signout')} />

@@ -1,8 +1,6 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-const OPEN_EVENT = 'cachebrowse:popup-open';
-
 export default function PopupLayer({ anchorRef, open, onClose, className, children, align = 'right', overlayKind, overlayData, onOverlayAction, closeAfterAction = false }) {
   const popupRef = useRef(null);
   const overlayId = useRef(globalThis.crypto?.randomUUID?.() || `popup-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -17,8 +15,6 @@ export default function PopupLayer({ anchorRef, open, onClose, className, childr
 
   useLayoutEffect(() => {
     if (!open) return undefined;
-    window.dispatchEvent(new Event(OPEN_EVENT));
-
     let frame = 0;
     const place = () => {
       cancelAnimationFrame(frame);
@@ -38,12 +34,17 @@ export default function PopupLayer({ anchorRef, open, onClose, className, childr
       });
     };
     const outside = event => {
-      if (popupRef.current?.contains(event.target) || anchorRef.current?.contains(event.target)) return;
+      const insidePopup = popupRef.current?.contains(event.target) || anchorRef.current?.contains(event.target);
+      if (insidePopup) return;
       if (overlayKind && window.cacheBrowse?.showPopupOverlay) window.cacheBrowse.closePopupOverlay?.(overlayId.current);
       onClose();
     };
-    const keydown = event => { if (!overlayKind && event.key === 'Escape') { event.stopPropagation(); onClose(); } };
-    const otherPopup = () => closeRef.current();
+    const keydown = event => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        onClose();
+      }
+    };
     const onNativeClose = payload => {
       if (payload?.id !== overlayId.current) return;
       closeRef.current();
@@ -58,7 +59,6 @@ export default function PopupLayer({ anchorRef, open, onClose, className, childr
     document.addEventListener('keydown', keydown);
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
-    window.addEventListener(OPEN_EVENT, otherPopup);
     const unsubscribeClose = window.cacheBrowse?.subscribe?.('popupClosed', onNativeClose);
     const unsubscribeAction = window.cacheBrowse?.subscribe?.('popupAction', onNativeAction);
     place();
@@ -68,7 +68,6 @@ export default function PopupLayer({ anchorRef, open, onClose, className, childr
       document.removeEventListener('keydown', keydown);
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
-      window.removeEventListener(OPEN_EVENT, otherPopup);
       unsubscribeClose?.();
       unsubscribeAction?.();
       if (overlayKind) window.cacheBrowse?.closePopupOverlay?.(overlayId.current);

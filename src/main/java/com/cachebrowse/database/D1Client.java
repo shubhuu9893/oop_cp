@@ -250,6 +250,11 @@ public class D1Client {
         return available && config != null && config.isConfigured();
     }
 
+    /** Whether this client has not been marked unavailable after a failed request. */
+    public boolean isAvailable() {
+        return available;
+    }
+
     /** Mark the current startup attempt unavailable; retry is explicit and bounded by DatabaseManager. */
     public void markUnavailable() {
         available = false;

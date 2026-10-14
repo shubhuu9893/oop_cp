@@ -57,10 +57,10 @@ public class BlockList {
     }
 
     /**
-     * Checks if the given URL matches any rule in this block list.
+     * Finds and returns the specific matching rule from this block list, or null if no rule matches.
      */
-    public boolean matches(String url) {
-        if (url == null || url.isBlank()) return false;
+    public String findMatchingRule(String url) {
+        if (url == null || url.isBlank()) return null;
         String lowerUrl = url.toLowerCase();
 
         String host = null;
@@ -82,20 +82,27 @@ public class BlockList {
             if (rule.startsWith("*.")) {
                 String domain = rule.substring(2);
                 if (host != null && (host.equals(domain) || host.endsWith("." + domain))) {
-                    return true;
+                    return rule;
                 }
             } else if (rule.startsWith("*")) {
                 String suffix = rule.substring(1);
                 if (host != null && host.endsWith(suffix)) {
-                    return true;
+                    return rule;
                 }
             } else if (host != null && (host.equalsIgnoreCase(rule) || host.endsWith("." + rule))) {
-                return true;
+                return rule;
             } else if (lowerUrl.contains(rule)) {
-                return true;
+                return rule;
             }
         }
-        return false;
+        return null;
+    }
+
+    /**
+     * Checks if the given URL matches any rule in this block list.
+     */
+    public boolean matches(String url) {
+        return findMatchingRule(url) != null;
     }
 
     private String extractHostFallback(String url) {

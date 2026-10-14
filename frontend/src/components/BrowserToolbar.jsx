@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import AddressBar from './AddressBar.jsx';
 import UserMenu from './UserMenu.jsx';
 import ProtectionMenu from './ProtectionMenu.jsx';
@@ -11,7 +11,7 @@ import './BrowserToolbar.css';
 
 function NavBtn({ icon: Icon, onClick, title, disabled }) {
   return (
-    <button className={`toolbar-btn nav${disabled ? ' disabled' : ''}`} onClick={onClick} title={title} aria-label={title} disabled={disabled}>
+    <button type="button" className={`toolbar-btn nav${disabled ? ' disabled' : ''}`} onClick={onClick} title={title} aria-label={title} disabled={disabled}>
       <Icon size={16} />
     </button>
   );
@@ -19,7 +19,7 @@ function NavBtn({ icon: Icon, onClick, title, disabled }) {
 
 function ToolBtn({ icon: Icon, onClick, title, active }) {
   return (
-    <button className={`toolbar-btn${active ? ' active' : ''}`} onClick={onClick} title={title} aria-label={title} aria-pressed={active}>
+    <button type="button" className={`toolbar-btn${active ? ' active' : ''}`} onClick={onClick} title={title} aria-label={title} aria-pressed={active}>
       <Icon size={15} />
     </button>
   );
@@ -30,12 +30,16 @@ export default function BrowserToolbar({
   browserEngineAvailable = Boolean(window.cacheBrowse),
   canGoBack, canGoForward,
   onNavigate, onBack, onForward, onReload, onStop, onHome,
-  onHistory, onBookmark, onBookmarks, onDownloads, onDashboard, onAdmin, onSettings,
+  onHistory, onBookmark, onBookmarks, onDownloads, onDashboard, onSettings,
   protection, onToggleAdBlock, onToggleTrackerBlock,
   user, onLogin, onLogout,
   stats,
   bookmarkActive = false,
 }) {
+  const [activePopup, setActivePopup] = useState(null);
+  const togglePopup = useCallback(kind => setActivePopup(current => current === kind ? null : kind), []);
+  const closePopup = useCallback(kind => setActivePopup(current => current === kind ? null : current), []);
+
   return (
     <div className="browser-toolbar">
       {/* Navigation */}
@@ -62,6 +66,9 @@ export default function BrowserToolbar({
 
         {/* Protection */}
         <ProtectionMenu
+          open={activePopup === 'protection'}
+          onTogglePopup={() => togglePopup('protection')}
+          onClosePopup={() => closePopup('protection')}
           protection={protection}
           stats={stats}
           onToggleAdBlock={onToggleAdBlock}
@@ -73,7 +80,13 @@ export default function BrowserToolbar({
         <ToolBtn icon={IconDashboard} onClick={onDashboard} title="Dashboard" />
         <ToolBtn icon={IconSettings}  onClick={onSettings}  title="Settings"  />
 
-        <UserMenu user={user} onLogin={onLogin} onLogout={onLogout} onDashboard={onDashboard} onAdmin={onAdmin} onSettings={onSettings} />
+        <UserMenu
+          open={activePopup === 'profile'}
+          onTogglePopup={() => togglePopup('profile')}
+          onClosePopup={() => closePopup('profile')}
+          user={user} onLogin={onLogin} onLogout={onLogout}
+          onDashboard={onDashboard} onSettings={onSettings}
+        />
       </div>
     </div>
   );

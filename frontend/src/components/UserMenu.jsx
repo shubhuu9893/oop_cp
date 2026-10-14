@@ -3,11 +3,20 @@ import { IconUser, IconDashboard, IconSettings, IconLogout, IconChevronDown } fr
 import PopupLayer from './PopupLayer.jsx';
 import './UserMenu.css';
 
-export default function UserMenu({ user, onLogin, onLogout, onDashboard, onAdmin, onSettings }) {
-  const [open, setOpen] = useState(false);
+export default function UserMenu({ user, onLogin, onLogout, onDashboard, onSettings, open: controlledOpen, onTogglePopup, onClosePopup }) {
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
   const ref = useRef(null);
+  const triggerRef = useRef(null);
 
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => {
+    if (onClosePopup) onClosePopup();
+    else setLocalOpen(false);
+  }, [onClosePopup]);
+  const toggle = useCallback(event => {
+    if (onTogglePopup) onTogglePopup(event);
+    else setLocalOpen(value => !value);
+  }, [onTogglePopup]);
 
   const displayName = user?.displayName || '';
   const initial = (displayName || user?.email || '?')[0].toUpperCase();
@@ -15,7 +24,7 @@ export default function UserMenu({ user, onLogin, onLogout, onDashboard, onAdmin
 
   if (!user) {
     return (
-      <button className="user-login-btn" onClick={onLogin} title="Sign in">
+      <button type="button" className="user-login-btn" onClick={onLogin} title="Sign in">
         <IconUser size={14} />
         <span>Sign In</span>
       </button>
@@ -24,17 +33,16 @@ export default function UserMenu({ user, onLogin, onLogout, onDashboard, onAdmin
 
   return (
     <div className="user-menu" ref={ref}>
-      <button ref={ref} className="user-avatar-btn" onClick={() => setOpen(o => !o)} title={email} aria-label="Profile menu" aria-expanded={open}>
+      <button type="button" ref={triggerRef} className="user-avatar-btn" onClick={toggle} title={email} aria-label="Profile menu" aria-expanded={open}>
         <span className="user-avatar">{initial}</span>
         <IconChevronDown size={12} style={{ color: 'var(--text-muted)', marginLeft: 2 }} />
       </button>
 
       <PopupLayer
-        anchorRef={ref} open={open} onClose={close} className="user-dropdown fade-in"
-        overlayKind="profile" overlayData={{ displayName: displayName || email.split('@')[0], email, initial, admin: user.admin === true }} closeAfterAction
+        anchorRef={triggerRef} open={open} onClose={close} className="user-dropdown fade-in"
+        overlayKind="profile" overlayData={{ displayName: displayName || email.split('@')[0], email, initial }} closeAfterAction
         onOverlayAction={action => {
           if (action === 'dashboard') onDashboard?.();
-          else if (action === 'admin') onAdmin?.();
           else if (action === 'settings') onSettings?.();
           else if (action === 'signout') onLogout?.();
         }}
@@ -47,11 +55,10 @@ export default function UserMenu({ user, onLogin, onLogout, onDashboard, onAdmin
             </div>
           </div>
           <div className="user-dropdown__divider" />
-          <MenuItem icon={IconDashboard} label="Dashboard" onClick={() => { setOpen(false); onDashboard?.(); }} />
-          {user.admin && <MenuItem icon={IconDashboard} label="Admin Dashboard" onClick={() => { setOpen(false); onAdmin?.(); }} />}
-          <MenuItem icon={IconSettings}  label="Settings"  onClick={() => { setOpen(false); onSettings?.(); }} />
+          <MenuItem icon={IconDashboard} label="Dashboard" onClick={() => { close(); onDashboard?.(); }} />
+          <MenuItem icon={IconSettings}  label="Settings"  onClick={() => { close(); onSettings?.(); }} />
           <div className="user-dropdown__divider" />
-          <MenuItem icon={IconLogout} label="Sign Out" onClick={() => { setOpen(false); onLogout?.(); }} danger />
+          <MenuItem icon={IconLogout} label="Sign Out" onClick={() => { close(); onLogout?.(); }} danger />
       </PopupLayer>
     </div>
   );

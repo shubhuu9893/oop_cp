@@ -1,62 +1,96 @@
 package com.cachebrowse.auth;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
-import com.google.firebase.auth.ListUsersPage;
-import com.google.firebase.auth.UserRecord;
-import com.google.firebase.auth.UserInfo;
 import java.io.IOException;
-import java.util.List;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
-import java.util.Optional;
 
-/** Verifies Firebase ID tokens and exposes least-privilege Firebase user-directory operations. */
+/** Verifies Firebase ID tokens server-side for user-scoped API access. */
 public final class FirebaseIdentityService implements IdentityVerifier {
     public record Principal(String uid, String email, String displayName,
                             boolean emailVerified, String provider) { }
-    public record DirectoryUser(String uid, String email, String displayName,
-                                long createdAt, boolean disabled, boolean emailVerified,
-                                List<String> providers) { }
-    public record UserPage(List<DirectoryUser> users, String nextPageToken) { }
 
     private final FirebaseAuth auth;
-    private final String adminUid;
+    private static volatile String initializationIssue = "not_initialized";
 
-    public FirebaseIdentityService(FirebaseAuth auth, String adminUid) {
+    public FirebaseIdentityService(FirebaseAuth auth) {
         this.auth = auth;
-        this.adminUid = adminUid == null ? "" : adminUid.trim();
     }
 
     public static FirebaseIdentityService fromEnvironment() {
         String projectId = com.cachebrowse.config.EnvConfig.get("FIREBASE_PROJECT_ID");
-        String adminUid = com.cachebrowse.config.EnvConfig.get("CACHEBROWSE_ADMIN_UID");
-        if (projectId == null || projectId.isBlank()) return null;
+        if (projectId.isBlank()) {
+            initializationIssue = "missing_firebase_project_id";
+            logUnavailable(initializationIssue);
+            return null;
+        }
         try {
             String credentialPath = com.cachebrowse.config.EnvConfig.get("GOOGLE_APPLICATION_CREDENTIALS");
-            if (!credentialPath.isBlank()) System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", credentialPath);
-            GoogleCredentials credentials = GoogleCredentials.getApplicationDefault();
+            GoogleCredentials credentials;
+            if (!credentialPath.isBlank()) {
+                Path resolved = com.cachebrowse.config.EnvConfig.resolveProjectPath(credentialPath).toAbsolutePath();
+                if (!Files.isRegularFile(resolved) || !Files.isReadable(resolved)) {
+                    initializationIssue = "service_account_file_missing_or_unreadable";
+                    logUnavailable(initializationIssue);
+                    return null;
+                }
+                // ADC reads the process environment, not Java system
+                // properties. Load an explicitly configured file directly so
+                // .env-based configuration works reliably from Maven/IDE
+                // launches as well.
+                try (InputStream stream = Files.newInputStream(resolved)) {
+                    credentials = ServiceAccountCredentials.fromStream(stream);
+                }
+            } else {
+                credentials = GoogleCredentials.getApplicationDefault();
+            }
+            if (credentials instanceof ServiceAccountCredentials serviceAccount
+                    && serviceAccount.getProjectId() != null
+                    && !projectId.equals(serviceAccount.getProjectId())) {
+                initializationIssue = "service_account_project_mismatch";
+                logUnavailable(initializationIssue);
+                return null;
+            }
             FirebaseApp app;
             synchronized (FirebaseIdentityService.class) {
                 app = FirebaseApp.getApps().stream()
-                        .filter(candidate -> candidate.getName().equals("cachebrowse-admin"))
+                        .filter(candidate -> candidate.getName().equals("cachebrowse-token-verifier"))
                         .findFirst().orElseGet(() -> {
                             try {
                                 return FirebaseApp.initializeApp(FirebaseOptions.builder()
                                         .setCredentials(credentials).setProjectId(projectId).build(),
-                                        "cachebrowse-admin");
+                                        "cachebrowse-token-verifier");
                             } catch (RuntimeException error) { throw error; }
                         });
             }
-            return new FirebaseIdentityService(FirebaseAuth.getInstance(app), adminUid);
-        } catch (IOException | RuntimeException error) {
+            initializationIssue = "none";
             org.slf4j.LoggerFactory.getLogger(FirebaseIdentityService.class)
-                    .warn("Firebase Admin is not available; protected API access is disabled ({})",
-                            error.getClass().getSimpleName());
+                    .info("Firebase ID-token verification initialized for configured project.");
+            return new FirebaseIdentityService(FirebaseAuth.getInstance(app));
+        } catch (IOException | RuntimeException error) {
+            String credentialPath = com.cachebrowse.config.EnvConfig.get("GOOGLE_APPLICATION_CREDENTIALS");
+            initializationIssue = credentialPath.isBlank()
+                    ? "application_default_credentials_unavailable"
+                    : "service_account_credentials_invalid";
+            org.slf4j.LoggerFactory.getLogger(FirebaseIdentityService.class)
+                    .warn("Firebase Admin initialization failed ({})", initializationIssue);
+            logUnavailable(initializationIssue);
             return null;
         }
+    }
+
+    public static String getInitializationIssue() { return initializationIssue; }
+
+    private static void logUnavailable(String issue) {
+        org.slf4j.LoggerFactory.getLogger(FirebaseIdentityService.class)
+                .warn("Firebase ID-token verification is unavailable ({}); protected API access remains disabled", issue);
     }
 
     public Principal verify(String idToken) throws Exception {
@@ -70,32 +104,6 @@ public final class FirebaseIdentityService implements IdentityVerifier {
         }
         return new Principal(decoded.getUid(), stringClaim(claims, "email"),
                 stringClaim(claims, "name"), Boolean.TRUE.equals(claims.get("email_verified")), provider);
-    }
-
-    public boolean isAdmin(Principal principal) {
-        return principal != null && !adminUid.isBlank() && adminUid.equals(principal.uid());
-    }
-
-    public UserPage listUsers(int pageSize, String pageToken) throws Exception {
-        ListUsersPage page = auth.listUsers(pageToken, pageSize);
-        List<DirectoryUser> users = new java.util.ArrayList<>();
-        for (UserRecord user : page.getValues()) users.add(toDirectoryUser(user));
-        return new UserPage(users, page.getNextPageToken());
-    }
-
-    public Optional<DirectoryUser> getUser(String uid) throws Exception {
-        try { return Optional.of(toDirectoryUser(auth.getUser(uid))); }
-        catch (com.google.firebase.auth.FirebaseAuthException error) {
-            if ("user-not-found".equals(error.getErrorCode())) return Optional.empty();
-            throw error;
-        }
-    }
-
-    private DirectoryUser toDirectoryUser(UserRecord user) {
-        return new DirectoryUser(user.getUid(), user.getEmail(), user.getDisplayName(),
-                user.getUserMetadata() == null ? 0 : user.getUserMetadata().getCreationTimestamp(),
-                user.isDisabled(), user.isEmailVerified(),
-                java.util.Arrays.stream(user.getProviderData()).map(UserInfo::getProviderId).toList());
     }
 
     private static String stringClaim(Map<String, Object> claims, String name) {

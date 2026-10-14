@@ -3,11 +3,20 @@ import { IconShield, IconCheck, IconX } from './icons/Icons.jsx';
 import PopupLayer from './PopupLayer.jsx';
 import './ProtectionMenu.css';
 
-export default function ProtectionMenu({ protection = {}, stats = {}, onToggleAdBlock, onToggleTrackerBlock }) {
-  const [open, setOpen] = useState(false);
+export default function ProtectionMenu({ protection = {}, stats = {}, onToggleAdBlock, onToggleTrackerBlock, open: controlledOpen, onTogglePopup, onClosePopup }) {
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
   const ref = useRef(null);
+  const triggerRef = useRef(null);
 
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => {
+    if (onClosePopup) onClosePopup();
+    else setLocalOpen(false);
+  }, [onClosePopup]);
+  const toggle = useCallback(event => {
+    if (onTogglePopup) onTogglePopup(event);
+    else setLocalOpen(value => !value);
+  }, [onTogglePopup]);
 
   const runtime = protection?.runtime;
   const available = protection != null && typeof protection?.adBlock === 'boolean';
@@ -31,9 +40,10 @@ export default function ProtectionMenu({ protection = {}, stats = {}, onToggleAd
   return (
     <div className="protection-menu" ref={ref}>
       <button
+        type="button"
         className={`toolbar-btn protection-trigger${bothOn ? ' protected' : ' warning'}`}
-        ref={ref}
-        onClick={() => setOpen(o => !o)}
+        ref={triggerRef}
+        onClick={toggle}
         title={runtimeAvailable ? 'CacheBrowse Protection is active in Chromium' : 'Chromium protection status unavailable'}
         aria-label="CacheBrowse Protection"
         aria-expanded={open}
@@ -43,7 +53,7 @@ export default function ProtectionMenu({ protection = {}, stats = {}, onToggleAd
       </button>
 
       <PopupLayer
-        anchorRef={ref} open={open} onClose={close} className="protection-popup fade-in"
+        anchorRef={triggerRef} open={open} onClose={close} className="protection-popup fade-in"
         overlayKind="protection"
         overlayData={{
           adBlock: protection?.adBlock === true,
@@ -70,7 +80,7 @@ export default function ProtectionMenu({ protection = {}, stats = {}, onToggleAd
               <span>Ad Blocking</span>
               <span className={`badge ${runtimeAvailable ? (adOn ? 'badge-success' : 'badge-danger') : ''}`}>{protectionLabel(protection?.adBlock, adOn)}</span>
             </div>
-            <button aria-label="Toggle ad blocking" aria-pressed={protection?.adBlock === true} className={`protection-toggle ${protection?.adBlock ? 'on' : 'off'}`} onClick={onToggleAdBlock}>
+            <button type="button" aria-label="Toggle ad blocking" aria-pressed={protection?.adBlock === true} className={`protection-toggle ${protection?.adBlock ? 'on' : 'off'}`} onClick={onToggleAdBlock}>
               <span className="protection-toggle__thumb" />
             </button>
           </div>
@@ -80,7 +90,7 @@ export default function ProtectionMenu({ protection = {}, stats = {}, onToggleAd
               <span>Tracker Blocking</span>
               <span className={`badge ${runtimeAvailable ? (trkOn ? 'badge-success' : 'badge-danger') : ''}`}>{protectionLabel(protection?.trackerBlock, trkOn)}</span>
             </div>
-            <button aria-label="Toggle tracker blocking" aria-pressed={protection?.trackerBlock === true} className={`protection-toggle ${protection?.trackerBlock ? 'on' : 'off'}`} onClick={onToggleTrackerBlock}>
+            <button type="button" aria-label="Toggle tracker blocking" aria-pressed={protection?.trackerBlock === true} className={`protection-toggle ${protection?.trackerBlock ? 'on' : 'off'}`} onClick={onToggleTrackerBlock}>
               <span className="protection-toggle__thumb" />
             </button>
           </div>
