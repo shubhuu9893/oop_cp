@@ -35,3 +35,6 @@ frontend/out/
 .env
 *.pem
 serviceAccountKey.json
+serviceAccount.json
+*firebase-adminsdk*.json
+.env
